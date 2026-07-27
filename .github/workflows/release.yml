@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,16 +13,49 @@ jobs:
   build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Verify tag matches app version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          APP_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$APP_VERSION" != "$TAG_VERSION" ]]; then
+            echo "Info.plist version ($APP_VERSION) does not match tag ($TAG_VERSION)"
+            exit 1
+          fi
+
       - name: Build DMG
         run: |
           chmod +x build.sh package-dmg.sh "Создать установщик.command" "Первый запуск DieCloude.command"
           ./package-dmg.sh
+
+      - name: Prepare stable download filename
+        shell: bash
+        run: |
+          DMG=$(find build -maxdepth 1 -name 'DieCloude-*.dmg' -print -quit)
+          test -n "$DMG"
+          cp "$DMG" build/DieCloude.dmg
+          shasum -a 256 build/DieCloude.dmg > build/DieCloude.dmg.sha256
+
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          DMG=$(find build -maxdepth 1 -name 'DieCloude-*.dmg' -print -quit)
-          gh release create "${GITHUB_REF_NAME}" "$DMG" \
+          gh release create "${GITHUB_REF_NAME}" \
+            build/DieCloude.dmg \
+            build/DieCloude.dmg.sha256 \
             --title "DieCloude ${GITHUB_REF_NAME#v}" \
-            --generate-notes
+            --notes-file RELEASE_NOTES.md \
+            --verify-tag
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DieCloude-macOS
+          path: |
+            build/DieCloude.dmg
+            build/DieCloude.dmg.sha256
