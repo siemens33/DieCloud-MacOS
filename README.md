@@ -20,7 +20,7 @@ DieCloude использует стабильную визуальную сис�
 
 ### Нативный SoundCloud-клиент для macOS
 
-**Текущая версия: 3.5.0 (сборка 22)**
+**Текущая версия: 3.5.1 (сборка 29)**
 
 [![macOS](https://img.shields.io/badge/macOS-12%2B-black?logo=apple)](https://github.com/siemens33/DieCloud-MacOS/releases/latest)
 [![Latest release](https://img.shields.io/github/v/release/siemens33/DieCloud-MacOS?display_name=tag)](https://github.com/siemens33/DieCloud-MacOS/releases/latest)
