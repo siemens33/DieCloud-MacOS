@@ -1,0 +1,27 @@
+name: Build macOS release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build DMG
+        run: |
+          chmod +x build.sh package-dmg.sh "Создать установщик.command" "Первый запуск DieCloude.command"
+          ./package-dmg.sh
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DMG=$(find build -maxdepth 1 -name 'DieCloude-*.dmg' -print -quit)
+          gh release create "${GITHUB_REF_NAME}" "$DMG" \
+            --title "DieCloude ${GITHUB_REF_NAME#v}" \
+            --generate-notes
