@@ -58,7 +58,7 @@ enum SubscriptionParser {
     private static func parseLine(_ line: String) -> VPNServer? {
         if line.hasPrefix("vmess://") { return parseVMess(line) }
         guard let components = URLComponents(string: line), let scheme = components.scheme?.lowercased() else { return nil }
-        guard ["vless", "trojan", "ss", "socks"].contains(scheme) else { return nil }
+        guard ["vless", "trojan", "socks"].contains(scheme) else { return nil }
         let host = components.host ?? ""
         let port = components.port ?? defaultPort(scheme)
         guard !host.isEmpty, port > 0 else { return nil }
@@ -105,7 +105,7 @@ final class XrayManager {
         let task = Process()
         task.executableURL = binary
         task.arguments = ["run", "-config", configURL.path]
-        task.standardOutput = Pipe(); task.standardError = Pipe()
+        task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice
         try task.run()
         process = task
         Thread.sleep(forTimeInterval: 0.35)
@@ -151,7 +151,9 @@ final class XrayManager {
     }
 
     private func vmessOutbound(_ uri: String) throws -> [String: Any] {
-        let encoded = String(uri.dropFirst("vmess://".count)); let padded = encoded + String(repeating: "=", count: (4 - encoded.count % 4) % 4)
+        let encoded = String(uri.dropFirst("vmess://".count))
+        let normalized = encoded.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        let padded = normalized + String(repeating: "=", count: (4 - normalized.count % 4) % 4)
         guard let data = Data(base64Encoded: padded), let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let host = j["add"] as? String, let id = j["id"] as? String else { throw invalidKey() }
         let port = Int(j["port"] as? String ?? "") ?? 443
@@ -235,13 +237,40 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
         for index in servers.indices { measure(index:index) }
     }
 
-    private func measure(index:Int) {
-        let s=servers[index]; let start=DispatchTime.now(); let port=NWEndpoint.Port(rawValue:UInt16(s.port))!
-        let connection=NWConnection(host:NWEndpoint.Host(s.host),port:port,using:.tcp)
-        var finished=false
-        let finish:(Int?)->Void={ [weak self] value in guard !finished else{return}; finished=true; connection.cancel(); DispatchQueue.main.async { guard let self, index < self.servers.count else{return}; self.servers[index].pingMS=value; self.table.reloadData(); if self.servers.allSatisfy({$0.pingMS != nil}) { self.setStatus("Проверка завершена") } } }
-        connection.stateUpdateHandler={ state in switch state { case .ready: let ns=DispatchTime.now().uptimeNanoseconds-start.uptimeNanoseconds; finish(Int(ns/1_000_000)); case .failed: finish(9999); default: break } }
-        connection.start(queue:DispatchQueue.global(qos:.utility)); DispatchQueue.global().asyncAfter(deadline:.now()+3){finish(9999)}
+    private func measure(index: Int) {
+        guard index < servers.count,
+              let port = NWEndpoint.Port(rawValue: UInt16(servers[index].port)) else { return }
+        let server = servers[index]
+        let queue = DispatchQueue(label: "DieCloude.Ping.\(index)", qos: .utility)
+        let connection = NWConnection(host: NWEndpoint.Host(server.host), port: port, using: .tcp)
+        let start = DispatchTime.now()
+        var finished = false
+
+        func finish(_ value: Int) {
+            guard !finished else { return }
+            finished = true
+            connection.cancel()
+            DispatchQueue.main.async { [weak self] in
+                guard let self, index < self.servers.count else { return }
+                self.servers[index].pingMS = value
+                self.table.reloadData(forRowIndexes: IndexSet(integer: index), columnIndexes: IndexSet(integersIn: 0..<self.table.numberOfColumns))
+                if self.servers.allSatisfy({ $0.pingMS != nil }) { self.setStatus("Проверка завершена") }
+            }
+        }
+
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+                finish(Int(elapsed / 1_000_000))
+            case .failed, .cancelled:
+                finish(9999)
+            default:
+                break
+            }
+        }
+        connection.start(queue: queue)
+        queue.asyncAfter(deadline: .now() + 3) { finish(9999) }
     }
 
     @objc private func toggleConnection() {
@@ -264,16 +293,29 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
     }
 
     private func connect(server: VPNServer) {
-        do {
-            try XrayManager.shared.start(server: server)
-            UserDefaults.standard.set(server.rawURI, forKey: VPNDefaults.selectedURI)
-            if let row = servers.firstIndex(where: { $0.rawURI == server.rawURI }) {
-                table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        connectButton.isEnabled = false
+        setStatus("Подключение: \(server.name)…")
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            do {
+                try XrayManager.shared.start(server: server)
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    UserDefaults.standard.set(server.rawURI, forKey: VPNDefaults.selectedURI)
+                    if let row = self.servers.firstIndex(where: { $0.rawURI == server.rawURI }) {
+                        self.table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+                    }
+                    self.onProxyChanged?(true, XrayManager.shared.localPort)
+                    self.connectButton.title = "Отключить"
+                    self.connectButton.isEnabled = true
+                    self.setStatus("Подключено: \(server.name)")
+                }
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.connectButton.isEnabled = true
+                    self?.setStatus(error.localizedDescription)
+                }
             }
-            onProxyChanged?(true, XrayManager.shared.localPort)
-            connectButton.title = "Отключить"
-            setStatus("Подключено: \(server.name)")
-        } catch { setStatus(error.localizedDescription) }
+        }
     }
 
     private func persistServers() {

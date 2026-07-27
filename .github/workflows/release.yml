@@ -49,7 +49,7 @@ jobs:
             build/DieCloude.dmg \
             build/DieCloude.dmg.sha256 \
             --title "DieCloude ${GITHUB_REF_NAME#v}" \
-            --notes-file RELEASE_NOTES.md \
+            --generate-notes \
             --verify-tag
 
       - name: Upload workflow artifact

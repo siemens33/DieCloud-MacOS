@@ -1,176 +1,152 @@
 #!/bin/zsh
 set -euo pipefail
 
+REPO_URL="https://github.com/siemens33/DieCloud-MacOS.git"
+REPO_WEB="https://github.com/siemens33/DieCloud-MacOS"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-OWNER="siemens33"
-REPO="DieCloud-MacOS"
-REMOTE="https://github.com/$OWNER/$REPO.git"
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/diecloude-release.XXXXXX")"
-trap 'rm -rf "$WORK"' EXIT
+cd "$ROOT"
 
 pause_on_error() {
   local code=$?
   echo ""
-  echo "❌ Публикация остановлена. Код ошибки: $code"
-  echo "Проверь сообщение выше. Исходная папка не повреждена."
+  echo "❌ Публикация остановлена (код $code)."
+  echo "Окно не закроется автоматически — текст ошибки можно скопировать."
   read -k 1 '?Нажми любую клавишу, чтобы закрыть окно.'
-  exit $code
+  exit "$code"
 }
-trap pause_on_error ZERR
+trap pause_on_error ERR
 
 clear
-cat <<'BANNER'
-╭──────────────────────────────────────────────╮
-│        DieCloude — публикация в GitHub       │
-│  Версия, commit, tag, Actions, Release, DMG  │
-╰──────────────────────────────────────────────╯
-BANNER
+printf 'DieCloude — автоматическая публикация обновления\n\n'
 
-echo ""
-command -v git >/dev/null || { echo '❌ Git не найден.'; exit 1; }
+command -v git >/dev/null || { echo '❌ Git не найден. Установи Xcode Command Line Tools: xcode-select --install'; exit 1; }
 command -v gh >/dev/null || { echo '❌ GitHub CLI не найден. Установи: brew install gh'; exit 1; }
-command -v rsync >/dev/null || { echo '❌ rsync не найден.'; exit 1; }
-command -v python3 >/dev/null || { echo '❌ Python 3 не найден.'; exit 1; }
-gh auth status >/dev/null 2>&1 || { echo '❌ Выполни один раз: gh auth login'; exit 1; }
+gh auth status >/dev/null 2>&1 || { echo '❌ GitHub CLI не авторизован. Один раз выполни: gh auth login'; exit 1; }
 
-[[ -f "$ROOT/Info.plist" && -f "$ROOT/src/main.swift" ]] || {
-  echo '❌ Скрипт должен находиться в корне проекта DieCloude.'
-  exit 1
-}
+# Архив может быть распакован без скрытой папки .git. В этом случае
+# автоматически восстанавливаем связь с GitHub, не удаляя локальные файлы.
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo 'ℹ️ Git-репозиторий не найден. Восстанавливаю автоматически…'
+  git init -q
+  git symbolic-ref HEAD refs/heads/main
+  git remote add origin "$REPO_URL"
+  git fetch -q origin main --tags
+  git reset --mixed origin/main >/dev/null
+else
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    git remote add origin "$REPO_URL"
+  else
+    git remote set-url origin "$REPO_URL"
+  fi
+  git fetch -q origin main --tags
+fi
 
-echo "1/8  Получаю актуальный репозиторий…"
-git clone --quiet "$REMOTE" "$WORK/repo"
-REMOTE_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$WORK/repo/Info.plist")
-
-rsync -a --delete \
-  --exclude '.git/' \
-  --exclude 'build/' \
-  --exclude '.DS_Store' \
-  --exclude '*.zip' \
-  "$ROOT/" "$WORK/repo/"
-cd "$WORK/repo"
+# Не публикуем поверх чужих удалённых изменений.
+LOCAL_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
+REMOTE_HEAD=$(git rev-parse origin/main)
+if [[ -n "$LOCAL_HEAD" && "$LOCAL_HEAD" != "$REMOTE_HEAD" ]]; then
+  if git merge-base --is-ancestor "$LOCAL_HEAD" "$REMOTE_HEAD" 2>/dev/null; then
+    echo 'ℹ️ В GitHub появились новые изменения. Подтягиваю их…'
+    git rebase --autostash origin/main
+  elif ! git merge-base --is-ancestor "$REMOTE_HEAD" "$LOCAL_HEAD" 2>/dev/null; then
+    echo '❌ Локальная и удалённая история разошлись. Автоматическая публикация отменена, чтобы не потерять код.'
+    exit 1
+  fi
+fi
 
 CURRENT=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
 BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Info.plist)
-VERSION=$(python3 - "$CURRENT" "$REMOTE_VERSION" <<'PY'
-import sys
+VERSION="$CURRENT"
 
-def parse(value):
-    parts = value.split('.')
-    if len(parts) != 3 or not all(p.isdigit() for p in parts):
-        raise SystemExit(f'Некорректная версия: {value}')
-    return tuple(map(int, parts))
-
-local = parse(sys.argv[1])
-remote = parse(sys.argv[2])
-if local > remote:
-    print('.'.join(map(str, local)))
-else:
-    major, minor, patch = local
-    print(f'{major}.{minor}.{patch + 1}')
-PY
-)
+# Если текущая версия уже опубликована, автоматически повышаем patch: X.Y.Z → X.Y.(Z+1).
+if git show-ref --verify --quiet "refs/tags/v$VERSION" || gh release view "v$VERSION" --repo siemens33/DieCloud-MacOS >/dev/null 2>&1; then
+  IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+  VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+fi
 NEW_BUILD=$((BUILD + 1))
 
-if [[ "$VERSION" == "$CURRENT" ]]; then
-  echo "2/8  Публикую подготовленную версию $VERSION (сборка $NEW_BUILD)…"
-else
-  echo "2/8  Повышаю версию: $CURRENT → $VERSION (сборка $NEW_BUILD)…"
-fi
+echo "Текущая версия проекта: $CURRENT (сборка $BUILD)"
+echo "Будет опубликована:      $VERSION (сборка $NEW_BUILD)"
+printf 'Описание изменений (Enter — «Оптимизация и исправления»): '
+read NOTES
+[[ -n "$NOTES" ]] || NOTES='Оптимизация и исправления'
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Info.plist
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" Info.plist
 
-python3 - "$VERSION" <<'PY'
+python3 - "$VERSION" "$NOTES" <<'PY'
+from datetime import date
 from pathlib import Path
-import re, sys, datetime, subprocess
-version = sys.argv[1]
+import re
+import sys
 
-def replace(path, pattern, replacement, flags=0):
-    p = Path(path)
-    text = p.read_text(encoding='utf-8')
-    text, count = re.subn(pattern, replacement, text, count=1, flags=flags)
+version, notes = sys.argv[1], sys.argv[2]
+
+replacements = [
+    (Path('src/main.swift'), r'static let version = "[0-9]+\.[0-9]+\.[0-9]+"', f'static let version = "{version}"'),
+    (Path('package-dmg.sh'), r'^VERSION="[0-9]+\.[0-9]+\.[0-9]+"$', f'VERSION="{version}"'),
+]
+for path, pattern, replacement in replacements:
+    text = path.read_text(encoding='utf-8')
+    text, count = re.subn(pattern, replacement, text, count=1, flags=re.M)
     if count != 1:
         raise SystemExit(f'Не удалось обновить версию в {path}')
-    p.write_text(text, encoding='utf-8')
+    path.write_text(text, encoding='utf-8')
 
-replace('src/main.swift', r'static let version = "[0-9]+\.[0-9]+\.[0-9]+"', f'static let version = "{version}"')
-replace('package-dmg.sh', r'^VERSION="[0-9]+\.[0-9]+\.[0-9]+"$', f'VERSION="{version}"', re.M)
-
-result = subprocess.run(['git', 'diff', '--name-only'], capture_output=True, text=True, check=True)
-changed = [line for line in result.stdout.splitlines() if line and line not in {'CHANGELOG.md', 'RELEASE_NOTES.md'}]
-if changed:
-    bullets = '\n'.join(f'- Обновлён `{name}`.' for name in changed[:25])
-else:
-    bullets = '- Техническое обновление и синхронизация проекта.'
-
-date = datetime.date.today().isoformat()
-entry = f'## {version} — {date}\n\n{bullets}\n\n'
-path = Path('CHANGELOG.md')
-old = path.read_text(encoding='utf-8') if path.exists() else '# История изменений DieCloude\n\n'
-if old.startswith('# История изменений DieCloude'):
-    head, rest = old.split('\n', 1)
-    path.write_text(head + '\n\n' + entry + rest.lstrip('\n'), encoding='utf-8')
-else:
-    path.write_text('# История изменений DieCloude\n\n' + entry + old, encoding='utf-8')
-
-Path('RELEASE_NOTES.md').write_text(
-    f'# DieCloude {version}\n\n{bullets}\n\n'
-    'Скачай `DieCloude.dmg`, открой образ и перенеси приложение в папку «Программы».\n',
-    encoding='utf-8'
-)
+changelog = Path('CHANGELOG.md')
+old = changelog.read_text(encoding='utf-8') if changelog.exists() else '# История изменений\n'
+entry = f'\n## {version} — {date.today().isoformat()}\n\n- {notes.strip()}\n'
+if f'## {version} ' not in old:
+    if old.startswith('#'):
+        first_line, _, rest = old.partition('\n')
+        old = first_line + '\n' + entry + rest.lstrip('\n')
+    else:
+        old = '# История изменений\n' + entry + old
+    changelog.write_text(old, encoding='utf-8')
 PY
 
-echo "3/8  Проверяю проект…"
 plutil -lint Info.plist >/dev/null
-zsh -n build.sh package-dmg.sh "Опубликовать обновление.command" "Создать установщик.command"
+zsh -n build.sh package-dmg.sh "Опубликовать обновление.command"
 
-if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
-  echo "❌ Тег v$VERSION уже существует на GitHub."
-  exit 1
-fi
-
+# Не создаём пустой релиз.
 if [[ -z "$(git status --porcelain)" ]]; then
-  echo '❌ Нет изменений для публикации.'
+  echo '❌ Изменений для публикации нет.'
   exit 1
 fi
 
-echo "4/8  Создаю commit…"
-git config user.name "${GIT_AUTHOR_NAME:-siemens33}"
-git config user.email "${GIT_AUTHOR_EMAIL:-siemens33@users.noreply.github.com}"
 git add -A
-git commit -m "Release DieCloude $VERSION" >/dev/null
-
-echo "5/8  Отправляю main и тег v$VERSION…"
+git commit -m "Release DieCloude $VERSION: $NOTES"
 git push origin HEAD:main
-git tag -a "v$VERSION" -m "DieCloude $VERSION"
+git tag -a "v$VERSION" -m "$NOTES"
 git push origin "v$VERSION"
 
-echo "6/8  Ожидаю запуск GitHub Actions…"
-RUN_ID=""
-for attempt in {1..30}; do
-  RUN_ID=$(gh run list --repo "$OWNER/$REPO" --workflow release.yml --branch "v$VERSION" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)
+echo ''
+echo '⏳ GitHub Actions собирает DMG. Ожидаю завершения…'
+RUN_ID=$(gh run list --repo siemens33/DieCloud-MacOS --workflow release.yml --branch "v$VERSION" --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
+
+# Иногда запуск появляется не мгновенно.
+for _ in {1..12}; do
   [[ -n "$RUN_ID" ]] && break
-  sleep 2
+  sleep 5
+  RUN_ID=$(gh run list --repo siemens33/DieCloud-MacOS --workflow release.yml --limit 10 --json databaseId,headBranch --jq ".[] | select(.headBranch == \"v$VERSION\") | .databaseId" | head -n1)
 done
-[[ -n "$RUN_ID" ]] || { echo '❌ GitHub Actions не запустился в течение минуты.'; exit 1; }
 
-echo "7/8  GitHub собирает приложение и DMG…"
-gh run watch "$RUN_ID" --repo "$OWNER/$REPO" --exit-status
+if [[ -n "$RUN_ID" ]]; then
+  gh run watch "$RUN_ID" --repo siemens33/DieCloud-MacOS --exit-status
+else
+  echo '⚠️ Запуск Actions пока не найден. Код и тег уже отправлены.'
+fi
 
-echo "8/8  Проверяю опубликованный Release…"
-gh release view "v$VERSION" --repo "$OWNER/$REPO" >/dev/null
+if gh release view "v$VERSION" --repo siemens33/DieCloud-MacOS >/dev/null 2>&1; then
+  echo ''
+  echo "✅ DieCloude $VERSION опубликован."
+  echo "$REPO_WEB/releases/tag/v$VERSION"
+  open "$REPO_WEB/releases/tag/v$VERSION"
+else
+  echo ''
+  echo '⚠️ Код отправлен, но Release ещё не появился. Открываю GitHub Actions.'
+  open "$REPO_WEB/actions"
+fi
 
-rsync -a \
-  Info.plist src/main.swift package-dmg.sh README.md CHANGELOG.md RELEASE_NOTES.md \
-  "$ROOT/"
-
-RELEASE_URL="https://github.com/$OWNER/$REPO/releases/tag/v$VERSION"
-DOWNLOAD_URL="https://github.com/$OWNER/$REPO/releases/latest/download/DieCloude.dmg"
-
-echo ""
-echo "✅ DieCloude $VERSION полностью опубликован."
-echo "Release: $RELEASE_URL"
-echo "DMG:     $DOWNLOAD_URL"
-open "$RELEASE_URL"
+trap - ERR
 read -k 1 '?Нажми любую клавишу, чтобы закрыть окно.'

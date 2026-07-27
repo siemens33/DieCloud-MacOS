@@ -5,7 +5,7 @@ import Network
 
 enum AppConfig {
     static let name = "DieCloude"
-    static let version = "3.4.0"
+    static let version = "3.4.1"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
@@ -17,7 +17,7 @@ private enum DefaultsKey {
     static let theme = "DieCloudeDynamicThemeEnabled"
     static let ambient = "DieCloudeAmbientBackgroundEnabled"
     static let visualizer = "DieCloudeVisualizerEnabled"
-    static let welcome = "DieCloudeWelcomeV320Shown"
+    static let welcome = "DieCloudeWelcomeV340Shown"
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
@@ -151,7 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         configuration.websiteDataStore = .default()
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.userContentController.addUserScript(
-            WKUserScript(source: featureJavaScript(), injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+            WKUserScript(source: featureJavaScript(), injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
 
         webView = WKWebView(frame: .zero, configuration: configuration)
@@ -347,8 +347,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         guard !defaults.bool(forKey: DefaultsKey.welcome) else { return }
         let alert = NSAlert()
         alert.icon = NSApp.applicationIconImage
-        alert.messageText = "DieCloude 3.2"
-        alert.informativeText = "Добавлены обновления через GitHub Releases и автоподключение последнего VPN-сервера при запуске."
+        alert.messageText = "DieCloude 3.4"
+        alert.informativeText = "Ускорена работа интерфейса и веб-страницы, снижена нагрузка фоновых наблюдателей, исправлены зависания VPN и проверки серверов."
         alert.addButton(withTitle: "Начать слушать")
         alert.beginSheetModal(for: window) { _ in defaults.set(true, forKey: DefaultsKey.welcome) }
     }
@@ -437,8 +437,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         (() => {
           const initial = __SETTINGS__;
           if (window.__diecloude) { window.__diecloude.setAll(initial); return; }
+
           const root = document.documentElement;
-          const dc = { settings: initial, lastArtwork: '', pending: 0, observer: null };
+          const dc = {
+            settings: initial,
+            observer: null,
+            frame: 0,
+            artworkTimer: 0,
+            lastArtwork: '',
+            adSelectors: '[class*=adBanner i],[class*=advertisement i],[class*=sponsored i],[class*=upsell i],[data-testid*=advert i],[data-testid*=upsell i],[aria-label*=advertisement i],[aria-label*=реклама i],iframe[src*=doubleclick],iframe[src*=googlesyndication]'
+          };
+
           const style = document.createElement('style');
           style.id = 'dc-style';
           style.textContent = `
@@ -449,45 +458,100 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             html.dc-ambient body>*:not(#dc-ambient):not(#dc-visualizer){position:relative;z-index:1}
             html.dc-focus [class*=sidebar],html.dc-focus [class*=related],html.dc-focus [class*=comments],html.dc-focus [class*=commentForm],html.dc-focus [class*=rightSidebar],html.dc-focus [class*=streamSidebar],html.dc-focus aside{display:none!important}
             html.dc-focus [class*=l-fluid-fixed],html.dc-focus [class*=l-container],html.dc-focus main{max-width:1120px!important;margin-left:auto!important;margin-right:auto!important}
-            html.dc-adblock [class*=adBanner i],html.dc-adblock [class*=advertisement i],html.dc-adblock [class*=sponsored i],html.dc-adblock [class*=upsell i],html.dc-adblock [data-testid*=advert i],html.dc-adblock [data-testid*=upsell i],html.dc-adblock [aria-label*=advertisement i],html.dc-adblock [aria-label*=реклама i],html.dc-adblock iframe[src*=doubleclick],html.dc-adblock iframe[src*=googlesyndication]{display:none!important;visibility:hidden!important;max-height:0!important}
+            html.dc-adblock ${dc.adSelectors}{display:none!important;visibility:hidden!important;max-height:0!important}
             #dc-visualizer{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:2147483640;display:none;align-items:flex-end;gap:4px;height:34px;padding:7px 11px;border-radius:17px;background:rgba(12,12,14,.42);backdrop-filter:blur(14px);pointer-events:none}
             html.dc-visualizer #dc-visualizer{display:flex}#dc-visualizer i{display:block;width:4px;height:7px;border-radius:4px;background:var(--dc-accent);animation:dcbar .95s ease-in-out infinite alternate;animation-play-state:paused}html.dc-playing #dc-visualizer i{animation-play-state:running}
             #dc-visualizer i:nth-child(2n){animation-duration:.72s}#dc-visualizer i:nth-child(3n){animation-duration:1.15s}@keyframes dcbar{from{height:5px;opacity:.55}to{height:30px;opacity:1}}
             @media (prefers-reduced-motion:reduce){#dc-visualizer i{animation:none!important;height:10px}}
           `;
           (document.head || root).appendChild(style);
-          const ambient = document.createElement('div'); ambient.id='dc-ambient'; (document.body || root).prepend(ambient);
-          const viz = document.createElement('div'); viz.id='dc-visualizer'; viz.innerHTML='<i></i>'.repeat(12); (document.body || root).appendChild(viz);
-          const visible = e => e && e.isConnected && e.getClientRects().length;
-          const text = e => ((e?.getAttribute?.('aria-label') || e?.title || e?.textContent) || '').trim().toLowerCase();
-          const media = () => [...document.querySelectorAll('audio,video')].find(m => !m.paused) || document.querySelector('audio,video');
-          const artwork = () => {
-            const imgs=[...document.images].filter(visible).filter(i=>i.naturalWidth>=200&&i.naturalHeight>=200);
-            return imgs.sort((a,b)=>(b.clientWidth*b.clientHeight)-(a.clientWidth*a.clientHeight))[0]?.currentSrc || '';
+
+          const ambient = document.createElement('div'); ambient.id = 'dc-ambient';
+          const viz = document.createElement('div'); viz.id = 'dc-visualizer'; viz.innerHTML = '<i></i>'.repeat(12);
+          (document.body || root).prepend(ambient);
+          (document.body || root).appendChild(viz);
+
+          const visible = element => element?.isConnected && element.getClientRects().length > 0;
+          const media = () => document.querySelector('audio:not([paused]),video:not([paused])') || document.querySelector('audio,video');
+          const updatePlaying = () => {
+            const item = media();
+            root.classList.toggle('dc-playing', !!item && !item.paused && !document.hidden);
           };
+
+          const removeAdsFrom = node => {
+            if (!dc.settings.adBlock || !(node instanceof Element)) return;
+            if (node.matches(dc.adSelectors)) { node.remove(); return; }
+            node.querySelectorAll(dc.adSelectors).forEach(element => element.remove());
+          };
+
           const updateArtwork = () => {
-            const url=artwork(); if(!url || url===dc.lastArtwork) return; dc.lastArtwork=url;
+            dc.artworkTimer = 0;
+            if (!dc.settings.theme && !dc.settings.ambient) return;
+            let best = null, bestArea = 0;
+            for (const image of document.images) {
+              if (!visible(image) || image.naturalWidth < 200 || image.naturalHeight < 200) continue;
+              const area = image.clientWidth * image.clientHeight;
+              if (area > bestArea) { best = image; bestArea = area; }
+            }
+            const url = best?.currentSrc || '';
+            if (!url || url === dc.lastArtwork) return;
+            dc.lastArtwork = url;
             root.style.setProperty('--dc-artwork', `url("${url.replaceAll('"','%22')}")`);
-            if(dc.settings.theme){ let h=0; for(const c of url) h=(h*31+c.charCodeAt(0))>>>0; root.style.setProperty('--dc-accent',`hsl(${h%360} 78% 58%)`); }
+            if (dc.settings.theme) {
+              let hash = 0;
+              for (const character of url) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+              root.style.setProperty('--dc-accent', `hsl(${hash % 360} 78% 58%)`);
+            }
           };
-          const updatePlaying = () => root.classList.toggle('dc-playing', !!media() && !media().paused && !document.hidden);
-          const removeAds = () => {
-            if(!dc.settings.adBlock) return;
-            const selectors=['[class*=adBanner i]','[class*=advertisement i]','[class*=sponsored i]','[class*=upsell i]','[data-testid*=advert i]','[data-testid*=upsell i]','[aria-label*=advertisement i]','[aria-label*=реклама i]','iframe[src*=doubleclick]','iframe[src*=googlesyndication]'];
-            for(const s of selectors) for(const e of document.querySelectorAll(s)) e.remove();
-            for(const e of document.querySelectorAll('article,li,div')) if(visible(e)&&/^(advertisement|реклама|audio ad)$/i.test(text(e))&&e.offsetHeight<500)e.remove();
+
+          const scheduleArtwork = () => {
+            if (dc.artworkTimer) return;
+            dc.artworkTimer = window.setTimeout(updateArtwork, 700);
           };
-          const apply = () => {
-            root.classList.toggle('dc-adblock',!!dc.settings.adBlock); root.classList.toggle('dc-focus',!!dc.settings.focus);
-            root.classList.toggle('dc-theme',!!dc.settings.theme); root.classList.toggle('dc-ambient',!!dc.settings.ambient);
-            root.classList.toggle('dc-visualizer',!!dc.settings.visualizer); removeAds(); updateArtwork(); updatePlaying();
+
+          const applyClasses = () => {
+            root.classList.toggle('dc-adblock', !!dc.settings.adBlock);
+            root.classList.toggle('dc-focus', !!dc.settings.focus);
+            root.classList.toggle('dc-theme', !!dc.settings.theme);
+            root.classList.toggle('dc-ambient', !!dc.settings.ambient);
+            root.classList.toggle('dc-visualizer', !!dc.settings.visualizer);
+            updatePlaying();
+            scheduleArtwork();
           };
-          const schedule = () => { if(dc.pending) return; dc.pending=requestAnimationFrame(()=>{dc.pending=0;apply();}); };
-          dc.set=(k,v)=>{dc.settings[k]=!!v;apply();}; dc.setAll=s=>{Object.assign(dc.settings,s||{});apply();}; window.__diecloude=dc;
-          dc.observer=new MutationObserver(schedule); dc.observer.observe(root,{subtree:true,childList:true,attributes:true,attributeFilter:['src','class','aria-label']});
-          document.addEventListener('play',updatePlaying,true); document.addEventListener('pause',updatePlaying,true);
-          document.addEventListener('visibilitychange',updatePlaying); window.addEventListener('pagehide',()=>dc.observer?.disconnect(),{once:true});
-          apply();
+
+          const scheduleApply = () => {
+            if (dc.frame) return;
+            dc.frame = requestAnimationFrame(() => { dc.frame = 0; applyClasses(); });
+          };
+
+          dc.set = (key, value) => { dc.settings[key] = !!value; applyClasses(); if (key === 'adBlock' && value) removeAdsFrom(document.body); };
+          dc.setAll = values => { Object.assign(dc.settings, values || {}); applyClasses(); if (dc.settings.adBlock) removeAdsFrom(document.body); };
+          window.__diecloude = dc;
+
+          dc.observer = new MutationObserver(records => {
+            let needsArtwork = false;
+            for (const record of records) {
+              for (const node of record.addedNodes) {
+                removeAdsFrom(node);
+                if (node instanceof HTMLImageElement || node.querySelector?.('img')) needsArtwork = true;
+              }
+            }
+            if (needsArtwork) scheduleArtwork();
+            scheduleApply();
+          });
+          dc.observer.observe(document.body || root, { subtree: true, childList: true });
+
+          document.addEventListener('play', updatePlaying, true);
+          document.addEventListener('pause', updatePlaying, true);
+          document.addEventListener('visibilitychange', updatePlaying);
+          window.addEventListener('pagehide', () => {
+            dc.observer?.disconnect();
+            if (dc.frame) cancelAnimationFrame(dc.frame);
+            if (dc.artworkTimer) clearTimeout(dc.artworkTimer);
+          }, { once: true });
+
+          if (dc.settings.adBlock) removeAdsFrom(document.body);
+          applyClasses();
         })();
         """#.replacingOccurrences(of: "__SETTINGS__", with: settings)
     }
