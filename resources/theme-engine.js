@@ -6,7 +6,7 @@
   if (previous && typeof previous.destroy === 'function') previous.destroy();
 
   const root = document.documentElement;
-  const STYLE_ID = 'diecloude-theme-engine-351-player-rounding-fix';
+  const STYLE_ID = 'diecloude-theme-engine-352-polish';
   const state = { settings: { ...initial }, observer: null, frame: 0 };
 
   const selectors = {
@@ -97,30 +97,27 @@
         color: var(--dc-muted) !important;
       }
 
-      html.dc-modern [data-dc-player],
-      html.dc-modern .playControls {
-        left: 0 !important;
-        right: 0 !important;
-        width: 100% !important;
-        max-width: none !important;
-        margin: 0 !important;
-        border-radius: 0 !important;
-        background: var(--dc-surface) !important;
-        border-top: 1px solid var(--dc-line) !important;
-        box-shadow: none !important;
+      /* Matte player: translucent, blurred and visually continuous. */
+      html.dc-modern [data-dc-player] {
+        background: rgba(14,15,19,.74) !important;
+        -webkit-backdrop-filter: blur(22px) saturate(135%) !important;
+        backdrop-filter: blur(22px) saturate(135%) !important;
+        border-top: 1px solid rgba(255,255,255,.10) !important;
+        box-shadow: 0 -10px 32px rgba(0,0,0,.20) !important;
+        isolation: isolate !important;
       }
-      html.dc-modern .playControls__inner {
-        width: 100% !important;
-        max-width: none !important;
-        box-sizing: border-box !important;
-        background: transparent !important;
+      html.dc-modern [data-dc-player]::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(180deg, rgba(255,255,255,.035), transparent 45%);
+        z-index: -1;
       }
-      html.dc-modern .playControls__wrapper,
-      html.dc-modern .playControls__elements,
-      html.dc-modern .playControls__timeline,
-      html.dc-modern .playControls__soundBadge {
-        background: transparent !important;
-        box-shadow: none !important;
+      html.dc-modern [data-dc-player] > *,
+      html.dc-modern [data-dc-player] [class*="playControls__"],
+      html.dc-modern [data-dc-player] [class*="playbackSoundBadge"] {
+        background-color: transparent !important;
       }
       html.dc-modern [data-dc-player] button,
       html.dc-modern [data-dc-player] a,
@@ -128,6 +125,18 @@
         background-color: transparent !important;
         box-shadow: none !important;
         border-color: transparent !important;
+        transition: opacity var(--dc-fast), transform var(--dc-fast) !important;
+      }
+      html.dc-modern [data-dc-player] button:hover,
+      html.dc-modern [data-dc-player] a:hover,
+      html.dc-modern [data-dc-player] [role="button"]:hover {
+        opacity: .88 !important;
+        transform: translateY(-1px) !important;
+      }
+      html.dc-modern [data-dc-player] button:active,
+      html.dc-modern [data-dc-player] a:active,
+      html.dc-modern [data-dc-player] [role="button"]:active {
+        transform: scale(.96) !important;
       }
 
       /* Do not reposition the native SoundCloud timeline. Only recolor it. */
@@ -164,38 +173,50 @@
       html.dc-theme .sc-button-cta *,
       html.dc-theme .sc-button-primary * { color: #fff !important; fill: #fff !important; }
 
+      /* Rounded artwork without clip-path seams or rounded card frames. */
       html.dc-rounded [data-dc-artwork] {
-        border-radius: 10px !important;
+        border-radius: 11px !important;
         overflow: hidden !important;
-        clip-path: none !important;
         background-clip: padding-box !important;
-        isolation: isolate !important;
+        -webkit-mask-image: -webkit-radial-gradient(white, black) !important;
       }
-      html.dc-rounded [data-dc-artwork] > .image,
-      html.dc-rounded [data-dc-artwork] > .image__full,
-      html.dc-rounded [data-dc-artwork] .image__full,
       html.dc-rounded [data-dc-artwork] img,
-      html.dc-rounded img[data-dc-artwork] {
-        border-radius: 10px !important;
+      html.dc-rounded img[data-dc-artwork],
+      html.dc-rounded [data-dc-artwork] .image__full,
+      html.dc-rounded [data-dc-artwork] [style*="background-image"] {
+        border-radius: 11px !important;
         overflow: hidden !important;
-        display: block !important;
-        background-clip: padding-box !important;
       }
-      html.dc-rounded .playbackSoundBadge__avatar,
-      html.dc-rounded .playbackSoundBadge__avatar .image__full,
-      html.dc-rounded .playbackSoundBadge__avatar img {
+      html.dc-rounded [data-dc-player] [data-dc-artwork],
+      html.dc-rounded [data-dc-player] [data-dc-artwork] img {
         border-radius: 7px !important;
       }
 
+      /* Lightweight, reliable animations: artwork and controls only. */
+      @keyframes dcArtworkIn {
+        from { opacity: .001; transform: scale(.985); }
+        to { opacity: 1; transform: scale(1); }
+      }
       html.dc-hover [data-dc-artwork] {
+        animation: dcArtworkIn 220ms cubic-bezier(.2,.7,.2,1) both;
         transition: transform var(--dc-fast), filter var(--dc-fast), box-shadow var(--dc-fast) !important;
-        will-change: transform;
+        transform-origin: center;
+        backface-visibility: hidden;
       }
       html.dc-hover [data-dc-card]:hover [data-dc-artwork],
       html.dc-hover [data-dc-artwork]:hover {
-        transform: scale(1.015) !important;
-        filter: brightness(1.045) !important;
-        box-shadow: 0 0 0 1px rgba(255,255,255,.13), 0 8px 24px rgba(0,0,0,.22) !important;
+        transform: scale(1.012) !important;
+        filter: brightness(1.035) !important;
+        box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 10px 26px rgba(0,0,0,.20) !important;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html.dc-hover [data-dc-artwork],
+        html.dc-modern [data-dc-player] button,
+        html.dc-modern [data-dc-player] a,
+        html.dc-modern [data-dc-player] [role="button"] {
+          animation: none !important;
+          transition-duration: 1ms !important;
+        }
       }
 
       html.dc-compact .l-container,

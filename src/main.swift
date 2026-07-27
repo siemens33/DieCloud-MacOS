@@ -5,7 +5,7 @@ import Network
 
 enum AppConfig {
     static let name = "DieCloude"
-    static let version = "3.5.1"
+    static let version = "3.5.2"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
@@ -20,8 +20,8 @@ private enum DefaultsKey {
     static let roundedCards = "DieCloudeRoundedCardsEnabled"
     static let artworkHover = "DieCloudeArtworkHoverEnabled"
     static let compactMode = "DieCloudeCompactModeEnabled"
-    static let welcome = "DieCloudeWelcomeV351PlayerRoundingShown"
-    static let darkThemeFix = "DieCloudeVisualSystemV351PlayerRoundingBuild28"
+    static let welcome = "DieCloudeWelcomeV352PolishShown"
+    static let darkThemeFix = "DieCloudeVisualSystemV352Build29"
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
@@ -61,8 +61,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let defaults = UserDefaults.standard
 
-        // 3.5.1 player and artwork polish migration. Keep the stable build 25 preset
-        // and apply a restrained monochrome configuration.
+        // 3.5.2 visual polish migration: preserve the stable theme and enable
+        // corrected artwork rounding plus lightweight interface animations.
         if !defaults.bool(forKey: DefaultsKey.darkThemeFix) {
             defaults.set(true, forKey: DefaultsKey.modernDesign)
             defaults.set(false, forKey: DefaultsKey.glassPanels)
@@ -422,8 +422,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         guard !defaults.bool(forKey: DefaultsKey.welcome) else { return }
         let alert = NSAlert()
         alert.icon = NSApp.applicationIconImage
-        alert.messageText = "DieCloude 3.5.1"
-        alert.informativeText = "Исправлены только нижняя панель проигрывателя и скругление обложек. Остальной дизайн build 25 сохранён без изменений."
+        alert.messageText = "DieCloude 3.5.2"
+        alert.informativeText = "Обновлённый матовый плеер, исправленные скругления обложек и лёгкие надёжные анимации интерфейса."
         alert.addButton(withTitle: "Начать слушать")
         alert.beginSheetModal(for: window) { _ in defaults.set(true, forKey: DefaultsKey.welcome) }
     }
