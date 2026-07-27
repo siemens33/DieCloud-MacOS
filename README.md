@@ -12,25 +12,7 @@
 - Проверка обновлений через GitHub Releases при запуске и вручную через меню приложения.
 - Универсальная сборка Apple Silicon + Intel.
 
-## Настройка GitHub перед сборкой
 
-Открой `Info.plist` и замени:
-
-```xml
-<key>DieCloudeGitHubOwner</key><string>CHANGE_ME</string>
-<key>DieCloudeGitHubRepository</key><string>DieCloude</string>
-```
-
-`CHANGE_ME` — твой GitHub username или организация. Название репозитория должно совпадать с реальным.
-
-Автообновление читает последний публичный GitHub Release, сравнивает его тег с текущей версией, скачивает `.dmg` (или `.zip`) в «Загрузки» и открывает установщик. Полностью бесшумная замена `.app` не выполняется: для безопасного распространения нужен Developer ID и нотариализация Apple.
-
-## Публикация релиза
-
-1. Создай публичный репозиторий GitHub.
-2. Загрузи содержимое этой папки.
-3. Создай тег вида `v3.2.0` и отправь его в GitHub.
-4. Workflow `.github/workflows/release.yml` соберёт DMG и приложит его к GitHub Release.
 
 ## VPN при запуске
 
