@@ -8,8 +8,6 @@
 	<string>DieCloude</string>
 	<key>CFBundleExecutable</key>
 	<string>DieCloude</string>
-	<key>CFBundleIconFile</key>
-	<string>DieCloude.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>local.diecloude.native</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -22,12 +20,14 @@
 	<string>3.5.0</string>
 	<key>CFBundleVersion</key>
 	<string>18</string>
+	<key>CFBundleIconFile</key>
+	<string>DieCloude.icns</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
 	<key>DieCloudeGitHubOwner</key>
 	<string>siemens33</string>
 	<key>DieCloudeGitHubRepository</key>
 	<string>DieCloud-MacOS</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>12.0</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>

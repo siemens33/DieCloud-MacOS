@@ -29,6 +29,7 @@ private enum DefaultsKey {
     static let smoothScrolling = "DieCloudeSmoothScrollingEnabled"
     static let reduceMotion = "DieCloudeReduceMotionEnabled"
     static let welcome = "DieCloudeWelcomeV350Shown"
+    static let darkThemeFix = "DieCloudeDarkThemeCompatibilityFixV1"
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
@@ -48,17 +49,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     private var adBlockEnabled = true
     private var focusEnabled = false
-    private var themeEnabled = true
-    private var ambientEnabled = true
+    private var themeEnabled = false
+    private var ambientEnabled = false
     private var visualizerEnabled = false
     private var modernDesignEnabled = true
-    private var glassPanelsEnabled = true
+    private var glassPanelsEnabled = false
     private var roundedCardsEnabled = true
     private var hoverAnimationsEnabled = true
-    private var pageTransitionsEnabled = true
-    private var buttonGlowEnabled = true
+    private var pageTransitionsEnabled = false
+    private var buttonGlowEnabled = false
     private var spinningArtworkEnabled = false
-    private var playWaveEnabled = true
+    private var playWaveEnabled = false
     private var compactModeEnabled = false
     private var smoothScrollingEnabled = true
     private var reduceMotionEnabled = false
@@ -83,19 +84,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let defaults = UserDefaults.standard
+
+        // 3.5.0 dark-theme compatibility fix. Earlier builds enabled several
+        // experimental effects by default and could distort SoundCloud's dark UI.
+        // Reset only those unsafe visual effects once; users can enable them again.
+        if !defaults.bool(forKey: DefaultsKey.darkThemeFix) {
+            defaults.set(false, forKey: DefaultsKey.theme)
+            defaults.set(false, forKey: DefaultsKey.ambient)
+            defaults.set(false, forKey: DefaultsKey.glassPanels)
+            defaults.set(false, forKey: DefaultsKey.pageTransitions)
+            defaults.set(false, forKey: DefaultsKey.buttonGlow)
+            defaults.set(false, forKey: DefaultsKey.playWave)
+            defaults.set(true, forKey: DefaultsKey.darkThemeFix)
+        }
         adBlockEnabled = defaults.object(forKey: DefaultsKey.adBlock) == nil ? true : defaults.bool(forKey: DefaultsKey.adBlock)
         focusEnabled = defaults.bool(forKey: DefaultsKey.focus)
-        themeEnabled = defaults.object(forKey: DefaultsKey.theme) == nil ? true : defaults.bool(forKey: DefaultsKey.theme)
-        ambientEnabled = defaults.object(forKey: DefaultsKey.ambient) == nil ? true : defaults.bool(forKey: DefaultsKey.ambient)
+        themeEnabled = defaults.object(forKey: DefaultsKey.theme) == nil ? false : defaults.bool(forKey: DefaultsKey.theme)
+        ambientEnabled = defaults.object(forKey: DefaultsKey.ambient) == nil ? false : defaults.bool(forKey: DefaultsKey.ambient)
         visualizerEnabled = defaults.bool(forKey: DefaultsKey.visualizer)
         modernDesignEnabled = defaults.object(forKey: DefaultsKey.modernDesign) == nil ? true : defaults.bool(forKey: DefaultsKey.modernDesign)
-        glassPanelsEnabled = defaults.object(forKey: DefaultsKey.glassPanels) == nil ? true : defaults.bool(forKey: DefaultsKey.glassPanels)
+        glassPanelsEnabled = defaults.object(forKey: DefaultsKey.glassPanels) == nil ? false : defaults.bool(forKey: DefaultsKey.glassPanels)
         roundedCardsEnabled = defaults.object(forKey: DefaultsKey.roundedCards) == nil ? true : defaults.bool(forKey: DefaultsKey.roundedCards)
         hoverAnimationsEnabled = defaults.object(forKey: DefaultsKey.hoverAnimations) == nil ? true : defaults.bool(forKey: DefaultsKey.hoverAnimations)
-        pageTransitionsEnabled = defaults.object(forKey: DefaultsKey.pageTransitions) == nil ? true : defaults.bool(forKey: DefaultsKey.pageTransitions)
-        buttonGlowEnabled = defaults.object(forKey: DefaultsKey.buttonGlow) == nil ? true : defaults.bool(forKey: DefaultsKey.buttonGlow)
+        pageTransitionsEnabled = defaults.object(forKey: DefaultsKey.pageTransitions) == nil ? false : defaults.bool(forKey: DefaultsKey.pageTransitions)
+        buttonGlowEnabled = defaults.object(forKey: DefaultsKey.buttonGlow) == nil ? false : defaults.bool(forKey: DefaultsKey.buttonGlow)
         spinningArtworkEnabled = defaults.bool(forKey: DefaultsKey.spinningArtwork)
-        playWaveEnabled = defaults.object(forKey: DefaultsKey.playWave) == nil ? true : defaults.bool(forKey: DefaultsKey.playWave)
+        playWaveEnabled = defaults.object(forKey: DefaultsKey.playWave) == nil ? false : defaults.bool(forKey: DefaultsKey.playWave)
         compactModeEnabled = defaults.bool(forKey: DefaultsKey.compactMode)
         smoothScrollingEnabled = defaults.object(forKey: DefaultsKey.smoothScrolling) == nil ? true : defaults.bool(forKey: DefaultsKey.smoothScrolling)
         reduceMotionEnabled = defaults.bool(forKey: DefaultsKey.reduceMotion)
@@ -257,11 +271,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
         let designTitle = sectionLabel("Дизайн")
         modernDesignSwitch = checkbox("Современный дизайн DieCloude", state: modernDesignEnabled, action: #selector(toggleModernDesign(_:)))
-        glassPanelsSwitch = checkbox("Стеклянные полупрозрачные панели", state: glassPanelsEnabled, action: #selector(toggleGlassPanels(_:)))
+        glassPanelsSwitch = checkbox("Стеклянные панели (экспериментально)", state: glassPanelsEnabled, action: #selector(toggleGlassPanels(_:)))
         roundedCardsSwitch = checkbox("Скруглённые карточки треков", state: roundedCardsEnabled, action: #selector(toggleRoundedCards(_:)))
         compactModeSwitch = checkbox("Компактный режим", state: compactModeEnabled, action: #selector(toggleCompactMode(_:)))
-        themeSwitch = checkbox("Dynamic Theme — акцент от обложки", state: themeEnabled, action: #selector(toggleTheme(_:)))
-        ambientSwitch = checkbox("Ambient Background — фон из обложки", state: ambientEnabled, action: #selector(toggleAmbient(_:)))
+        themeSwitch = checkbox("Акцент от обложки (экспериментально)", state: themeEnabled, action: #selector(toggleTheme(_:)))
+        ambientSwitch = checkbox("Фон из обложки (экспериментально)", state: ambientEnabled, action: #selector(toggleAmbient(_:)))
 
         let animationTitle = sectionLabel("Анимации")
         hoverAnimationsSwitch = checkbox("Анимации при наведении", state: hoverAnimationsEnabled, action: #selector(toggleHoverAnimations(_:)))
@@ -536,28 +550,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
           style.id = 'dc-style';
           style.textContent = `
             :root{--dc-accent:#ff5500;--dc-artwork:none}
-            html.dc-theme a,html.dc-theme button[aria-pressed=true],html.dc-theme [role=slider]{accent-color:var(--dc-accent)!important}
-            #dc-ambient{position:fixed;inset:-50px;z-index:2147480000;pointer-events:none;opacity:0;transition:opacity .5s ease;background-image:linear-gradient(rgba(8,8,10,.66),rgba(8,8,10,.84)),var(--dc-artwork);background-size:cover;background-position:center;filter:blur(38px) saturate(1.25);transform:scale(1.06)}
-            html.dc-ambient #dc-ambient{opacity:.36}
-            html.dc-ambient body>*:not(#dc-ambient):not(#dc-visualizer){position:relative;z-index:1}
+            html.dc-theme{accent-color:var(--dc-accent)}
+            html.dc-theme input[type=range],html.dc-theme input[type=checkbox]{accent-color:var(--dc-accent)!important}
+            #dc-ambient{position:fixed;inset:-50px;z-index:-1;pointer-events:none;opacity:0;transition:opacity .45s ease;background-image:linear-gradient(rgba(12,12,15,.86),rgba(12,12,15,.94)),var(--dc-artwork);background-size:cover;background-position:center;filter:blur(52px) saturate(1.08);transform:scale(1.04)}
+            html.dc-ambient #dc-ambient{opacity:.22}
+            html.dc-ambient body{isolation:isolate;background-color:#111114!important}html.dc-ambient body>*:not(#dc-ambient):not(#dc-visualizer){position:relative;z-index:1}
             html.dc-focus [class*=sidebar],html.dc-focus [class*=related],html.dc-focus [class*=comments],html.dc-focus [class*=commentForm],html.dc-focus [class*=rightSidebar],html.dc-focus [class*=streamSidebar],html.dc-focus aside{display:none!important}
             html.dc-focus [class*=l-fluid-fixed],html.dc-focus [class*=l-container],html.dc-focus main{max-width:1120px!important;margin-left:auto!important;margin-right:auto!important}
             html.dc-adblock ${dc.adSelectors}{display:none!important;visibility:hidden!important;max-height:0!important}
             #dc-visualizer{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:2147483640;display:none;align-items:flex-end;gap:4px;height:34px;padding:7px 11px;border-radius:17px;background:rgba(12,12,14,.42);backdrop-filter:blur(14px);pointer-events:none}
             html.dc-visualizer #dc-visualizer{display:flex}#dc-visualizer i{display:block;width:4px;height:7px;border-radius:4px;background:var(--dc-accent);animation:dcbar .95s ease-in-out infinite alternate;animation-play-state:paused}html.dc-playing #dc-visualizer i{animation-play-state:running}
             #dc-visualizer i:nth-child(2n){animation-duration:.72s}#dc-visualizer i:nth-child(3n){animation-duration:1.15s}@keyframes dcbar{from{height:5px;opacity:.55}to{height:30px;opacity:1}}
-            html.dc-modern body{background:linear-gradient(145deg,#0d0d10,#17171c)!important}html.dc-modern [class*=header],html.dc-modern [class*=playControls]{border-color:rgba(255,255,255,.08)!important}
-            html.dc-glass [class*=header],html.dc-glass [class*=playControls],html.dc-glass [class*=sidebar],html.dc-glass [role=dialog]{background:rgba(20,20,24,.72)!important;backdrop-filter:blur(20px) saturate(1.3)!important;-webkit-backdrop-filter:blur(20px) saturate(1.3)!important}
-            html.dc-rounded [class*=soundList__item],html.dc-rounded [class*=stream__list] li,html.dc-rounded [class*=trackItem],html.dc-rounded [class*=systemPlaylist],html.dc-rounded article{border-radius:16px!important;overflow:hidden!important}
-            html.dc-hover [class*=soundList__item],html.dc-hover [class*=trackItem],html.dc-hover article,html.dc-hover button{transition:transform .2s ease,box-shadow .2s ease,filter .2s ease!important}html.dc-hover [class*=soundList__item]:hover,html.dc-hover [class*=trackItem]:hover,html.dc-hover article:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.25)}html.dc-hover button:hover{transform:scale(1.045)}
-            html.dc-transitions main,html.dc-transitions [role=main]{animation:dcPageIn .28s ease both}@keyframes dcPageIn{from{opacity:.25;transform:translateY(6px)}to{opacity:1;transform:none}}
+            html.dc-modern{color-scheme:dark}html.dc-modern .header,html.dc-modern .playControls,html.dc-modern .playControls__inner{border-color:rgba(255,255,255,.07)!important}
+            html.dc-glass .header,html.dc-glass .playControls,html.dc-glass .playControls__inner,html.dc-glass [role=dialog]{background-color:rgba(20,20,24,.90)!important;backdrop-filter:blur(14px) saturate(1.08)!important;-webkit-backdrop-filter:blur(14px) saturate(1.08)!important}
+            html.dc-rounded .soundList__item,html.dc-rounded .trackItem,html.dc-rounded .systemPlaylist,html.dc-rounded .soundBadge{border-radius:12px!important}
+            html.dc-hover .soundList__item,html.dc-hover .trackItem,html.dc-hover .soundBadge{transition:transform .18s ease,box-shadow .18s ease!important}html.dc-hover .soundList__item:hover,html.dc-hover .trackItem:hover,html.dc-hover .soundBadge:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.22)}
+            html.dc-transitions main{animation:dcPageIn .22s ease both}@keyframes dcPageIn{from{opacity:.25;transform:translateY(6px)}to{opacity:1;transform:none}}
             html.dc-glow button[title*=Play i],html.dc-glow button[aria-label*=Play i],html.dc-glow button[title*=Воспроизвести i],html.dc-glow button[aria-label*=Воспроизвести i]{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--dc-accent),transparent 30%))}
             html.dc-spin.dc-playing [class*=playbackSoundBadge] img,html.dc-spin.dc-playing [class*=playbackSoundBadge] [style*=background-image]{border-radius:50%!important;animation:dcSpin 14s linear infinite!important}@keyframes dcSpin{to{transform:rotate(360deg)}}
             html.dc-wave button[title*=Play i]::after,html.dc-wave button[aria-label*=Play i]::after{content:'';position:absolute;inset:-5px;border:2px solid var(--dc-accent);border-radius:50%;opacity:0;animation:dcWave 1.8s ease-out infinite;pointer-events:none}@keyframes dcWave{0%{transform:scale(.7);opacity:.65}100%{transform:scale(1.45);opacity:0}}
-            html.dc-compact [class*=soundList__item],html.dc-compact [class*=trackItem]{padding-top:6px!important;padding-bottom:6px!important}html.dc-compact [class*=image]{max-width:88px!important;max-height:88px!important}html.dc-compact [class*=header]{min-height:42px!important}
+            html.dc-compact .soundList__item,html.dc-compact .trackItem{padding-top:6px!important;padding-bottom:6px!important}html.dc-compact .soundBadge__avatar,html.dc-compact .sound__coverArt{max-width:88px!important;max-height:88px!important}
             html.dc-smooth{scroll-behavior:smooth!important}html.dc-smooth *{scroll-behavior:smooth!important}
             html.dc-reduced *,html.dc-reduced *::before,html.dc-reduced *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
-            @media (prefers-reduced-motion:reduce){#dc-visualizer i{animation:none!important;height:10px}html:not(.dc-reduced) *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+            @media (prefers-reduced-motion:reduce){#dc-visualizer i{animation:none!important;height:10px}html *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
           `;
           (document.head || root).appendChild(style);
 
