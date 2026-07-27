@@ -41,6 +41,7 @@ done
 
 cp "$ROOT/Info.plist" "$CONTENTS/Info.plist"
 cp "$ROOT/THIRD_PARTY_NOTICES.md" "$RESOURCES/THIRD_PARTY_NOTICES.md"
+cp "$ROOT/resources/theme-engine.js" "$RESOURCES/theme-engine.js"
 for s in 16 32 128 256 512; do
   sips -z $s $s "$ROOT/resources/DieCloudeIcon.png" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
   d=$((s*2))

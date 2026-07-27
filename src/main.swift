@@ -5,7 +5,7 @@ import Network
 
 enum AppConfig {
     static let name = "DieCloude"
-    static let version = "3.5.0"
+    static let version = "3.5.1"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
@@ -15,21 +15,13 @@ private enum DefaultsKey {
     static let adBlock = "DieCloudeAdBlockEnabled"
     static let focus = "DieCloudeFocusModeEnabled"
     static let theme = "DieCloudeDynamicThemeEnabled"
-    static let ambient = "DieCloudeAmbientBackgroundEnabled"
-    static let visualizer = "DieCloudeVisualizerEnabled"
     static let modernDesign = "DieCloudeModernDesignEnabled"
     static let glassPanels = "DieCloudeGlassPanelsEnabled"
     static let roundedCards = "DieCloudeRoundedCardsEnabled"
-    static let hoverAnimations = "DieCloudeHoverAnimationsEnabled"
-    static let pageTransitions = "DieCloudePageTransitionsEnabled"
-    static let buttonGlow = "DieCloudeButtonGlowEnabled"
-    static let spinningArtwork = "DieCloudeSpinningArtworkEnabled"
-    static let playWave = "DieCloudePlayWaveEnabled"
+    static let artworkHover = "DieCloudeArtworkHoverEnabled"
     static let compactMode = "DieCloudeCompactModeEnabled"
-    static let smoothScrolling = "DieCloudeSmoothScrollingEnabled"
-    static let reduceMotion = "DieCloudeReduceMotionEnabled"
-    static let welcome = "DieCloudeWelcomeV350Shown"
-    static let darkThemeFix = "DieCloudeDarkThemeCompatibilityFixV1"
+    static let welcome = "DieCloudeWelcomeV351PlayerRoundingShown"
+    static let darkThemeFix = "DieCloudeVisualSystemV351PlayerRoundingBuild28"
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
@@ -49,70 +41,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     private var adBlockEnabled = true
     private var focusEnabled = false
-    private var themeEnabled = false
-    private var ambientEnabled = false
-    private var visualizerEnabled = false
+    private var themeEnabled = true
     private var modernDesignEnabled = true
     private var glassPanelsEnabled = false
     private var roundedCardsEnabled = true
-    private var hoverAnimationsEnabled = true
-    private var pageTransitionsEnabled = false
-    private var buttonGlowEnabled = false
-    private var spinningArtworkEnabled = false
-    private var playWaveEnabled = false
+    private var artworkHoverEnabled = true
     private var compactModeEnabled = false
-    private var smoothScrollingEnabled = true
-    private var reduceMotionEnabled = false
     private var panelVisible = false
 
     private var adBlockSwitch: NSButton!
     private var focusSwitch: NSButton!
     private var themeSwitch: NSButton!
-    private var ambientSwitch: NSButton!
-    private var visualizerSwitch: NSButton!
     private var modernDesignSwitch: NSButton!
     private var glassPanelsSwitch: NSButton!
     private var roundedCardsSwitch: NSButton!
-    private var hoverAnimationsSwitch: NSButton!
-    private var pageTransitionsSwitch: NSButton!
-    private var buttonGlowSwitch: NSButton!
-    private var spinningArtworkSwitch: NSButton!
-    private var playWaveSwitch: NSButton!
+    private var artworkHoverSwitch: NSButton!
     private var compactModeSwitch: NSButton!
-    private var smoothScrollingSwitch: NSButton!
-    private var reduceMotionSwitch: NSButton!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let defaults = UserDefaults.standard
 
-        // 3.5.0 dark-theme compatibility fix. Earlier builds enabled several
-        // experimental effects by default and could distort SoundCloud's dark UI.
-        // Reset only those unsafe visual effects once; users can enable them again.
+        // 3.5.1 player and artwork polish migration. Keep the stable build 25 preset
+        // and apply a restrained monochrome configuration.
         if !defaults.bool(forKey: DefaultsKey.darkThemeFix) {
-            defaults.set(false, forKey: DefaultsKey.theme)
-            defaults.set(false, forKey: DefaultsKey.ambient)
+            defaults.set(true, forKey: DefaultsKey.modernDesign)
             defaults.set(false, forKey: DefaultsKey.glassPanels)
-            defaults.set(false, forKey: DefaultsKey.pageTransitions)
-            defaults.set(false, forKey: DefaultsKey.buttonGlow)
-            defaults.set(false, forKey: DefaultsKey.playWave)
+            defaults.set(true, forKey: DefaultsKey.roundedCards)
+            defaults.set(true, forKey: DefaultsKey.artworkHover)
+            defaults.set(false, forKey: DefaultsKey.compactMode)
+            defaults.set(true, forKey: DefaultsKey.theme)
             defaults.set(true, forKey: DefaultsKey.darkThemeFix)
         }
         adBlockEnabled = defaults.object(forKey: DefaultsKey.adBlock) == nil ? true : defaults.bool(forKey: DefaultsKey.adBlock)
         focusEnabled = defaults.bool(forKey: DefaultsKey.focus)
-        themeEnabled = defaults.object(forKey: DefaultsKey.theme) == nil ? false : defaults.bool(forKey: DefaultsKey.theme)
-        ambientEnabled = defaults.object(forKey: DefaultsKey.ambient) == nil ? false : defaults.bool(forKey: DefaultsKey.ambient)
-        visualizerEnabled = defaults.bool(forKey: DefaultsKey.visualizer)
+        themeEnabled = defaults.object(forKey: DefaultsKey.theme) == nil ? true : defaults.bool(forKey: DefaultsKey.theme)
         modernDesignEnabled = defaults.object(forKey: DefaultsKey.modernDesign) == nil ? true : defaults.bool(forKey: DefaultsKey.modernDesign)
         glassPanelsEnabled = defaults.object(forKey: DefaultsKey.glassPanels) == nil ? false : defaults.bool(forKey: DefaultsKey.glassPanels)
         roundedCardsEnabled = defaults.object(forKey: DefaultsKey.roundedCards) == nil ? true : defaults.bool(forKey: DefaultsKey.roundedCards)
-        hoverAnimationsEnabled = defaults.object(forKey: DefaultsKey.hoverAnimations) == nil ? true : defaults.bool(forKey: DefaultsKey.hoverAnimations)
-        pageTransitionsEnabled = defaults.object(forKey: DefaultsKey.pageTransitions) == nil ? false : defaults.bool(forKey: DefaultsKey.pageTransitions)
-        buttonGlowEnabled = defaults.object(forKey: DefaultsKey.buttonGlow) == nil ? false : defaults.bool(forKey: DefaultsKey.buttonGlow)
-        spinningArtworkEnabled = defaults.bool(forKey: DefaultsKey.spinningArtwork)
-        playWaveEnabled = defaults.object(forKey: DefaultsKey.playWave) == nil ? false : defaults.bool(forKey: DefaultsKey.playWave)
+        artworkHoverEnabled = defaults.object(forKey: DefaultsKey.artworkHover) == nil ? true : defaults.bool(forKey: DefaultsKey.artworkHover)
         compactModeEnabled = defaults.bool(forKey: DefaultsKey.compactMode)
-        smoothScrollingEnabled = defaults.object(forKey: DefaultsKey.smoothScrolling) == nil ? true : defaults.bool(forKey: DefaultsKey.smoothScrolling)
-        reduceMotionEnabled = defaults.bool(forKey: DefaultsKey.reduceMotion)
 
         buildMenu()
         buildWindow()
@@ -249,13 +216,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     private func buildSidePanel(in root: NSView) {
         sidePanel = NSVisualEffectView()
-        sidePanel.material = .sidebar
+        sidePanel.material = .hudWindow
+        sidePanel.appearance = NSAppearance(named: .darkAqua)
         sidePanel.blendingMode = .withinWindow
         sidePanel.state = .active
         sidePanel.wantsLayer = true
-        sidePanel.layer?.cornerRadius = 18
+        sidePanel.layer?.cornerRadius = 22
         sidePanel.layer?.masksToBounds = true
-        sidePanel.layer?.borderWidth = 0.5
+        sidePanel.layer?.borderWidth = 1
         sidePanel.layer?.borderColor = NSColor.separatorColor.cgColor
         sidePanel.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(sidePanel, positioned: .above, relativeTo: webView)
@@ -265,30 +233,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.translatesAutoresizingMaskIntoConstraints = false
         let name = NSTextField(labelWithString: AppConfig.name)
-        name.font = .systemFont(ofSize: 24, weight: .bold)
-        let subtitle = NSTextField(labelWithString: "Настройки внешнего вида и прослушивания")
+        name.font = .systemFont(ofSize: 28, weight: .bold)
+        let subtitle = NSTextField(labelWithString: "Настройте внешний вид и поведение SoundCloud")
         subtitle.textColor = .secondaryLabelColor
 
         let designTitle = sectionLabel("Дизайн")
-        modernDesignSwitch = checkbox("Современный дизайн DieCloude", state: modernDesignEnabled, action: #selector(toggleModernDesign(_:)))
-        glassPanelsSwitch = checkbox("Стеклянные панели (экспериментально)", state: glassPanelsEnabled, action: #selector(toggleGlassPanels(_:)))
-        roundedCardsSwitch = checkbox("Скруглённые карточки треков", state: roundedCardsEnabled, action: #selector(toggleRoundedCards(_:)))
-        compactModeSwitch = checkbox("Компактный режим", state: compactModeEnabled, action: #selector(toggleCompactMode(_:)))
-        themeSwitch = checkbox("Акцент от обложки (экспериментально)", state: themeEnabled, action: #selector(toggleTheme(_:)))
-        ambientSwitch = checkbox("Фон из обложки (экспериментально)", state: ambientEnabled, action: #selector(toggleAmbient(_:)))
-
-        let animationTitle = sectionLabel("Анимации")
-        hoverAnimationsSwitch = checkbox("Анимации при наведении", state: hoverAnimationsEnabled, action: #selector(toggleHoverAnimations(_:)))
-        pageTransitionsSwitch = checkbox("Плавные переходы страниц", state: pageTransitionsEnabled, action: #selector(togglePageTransitions(_:)))
-        buttonGlowSwitch = checkbox("Свечение кнопок воспроизведения", state: buttonGlowEnabled, action: #selector(toggleButtonGlow(_:)))
-        spinningArtworkSwitch = checkbox("Вращение обложки при воспроизведении", state: spinningArtworkEnabled, action: #selector(toggleSpinningArtwork(_:)))
-        playWaveSwitch = checkbox("Волна рядом с кнопкой Play", state: playWaveEnabled, action: #selector(togglePlayWave(_:)))
-        visualizerSwitch = checkbox("Визуализатор", state: visualizerEnabled, action: #selector(toggleVisualizer(_:)))
-        smoothScrollingSwitch = checkbox("Плавная прокрутка", state: smoothScrollingEnabled, action: #selector(toggleSmoothScrolling(_:)))
-        reduceMotionSwitch = checkbox("Сниженная анимация", state: reduceMotionEnabled, action: #selector(toggleReduceMotion(_:)))
+        modernDesignSwitch = checkbox("Минималистичный интерфейс DieCloude", state: modernDesignEnabled, action: #selector(toggleModernDesign(_:)))
+        roundedCardsSwitch = checkbox("Аккуратное скругление обложек", state: roundedCardsEnabled, action: #selector(toggleRoundedCards(_:)))
+        roundedCardsSwitch.toolTip = "Скругляет только обложки треков, альбомов и плейлистов"
+        artworkHoverSwitch = checkbox("Мягкий эффект при наведении", state: artworkHoverEnabled, action: #selector(toggleArtworkHover(_:)))
+        artworkHoverSwitch.toolTip = "Слегка увеличивает и подсвечивает только обложку, не двигая карточку"
+        compactModeSwitch = checkbox("Компактная плотность интерфейса", state: compactModeEnabled, action: #selector(toggleCompactMode(_:)))
+        compactModeSwitch.toolTip = "Уменьшает лишние вертикальные отступы без перестройки сетки SoundCloud"
+        themeSwitch = checkbox("Белый фирменный акцент", state: themeEnabled, action: #selector(toggleTheme(_:)))
 
         let listeningTitle = sectionLabel("Прослушивание")
-        focusSwitch = checkbox("Focus Mode — убрать лишние блоки", state: focusEnabled, action: #selector(toggleFocus(_:)))
+        focusSwitch = checkbox("Режим фокуса — скрыть рекомендации", state: focusEnabled, action: #selector(toggleFocus(_:)))
         adBlockSwitch = checkbox("Режим без рекламы", state: adBlockEnabled, action: #selector(toggleAdBlock(_:)))
         adBlockSwitch.toolTip = "Блокирует известные рекламные запросы и скрывает рекламные блоки"
 
@@ -301,10 +261,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let s3 = NSBox(); s3.boxType = .separator
         let close = symbolButton("xmark", action: #selector(toggleInfoPanel(_:)), tooltip: "Закрыть")
 
-        let stack = NSStackView(views: [icon, name, subtitle, s1, designTitle, modernDesignSwitch, glassPanelsSwitch, roundedCardsSwitch, compactModeSwitch, themeSwitch, ambientSwitch, s2, animationTitle, hoverAnimationsSwitch, pageTransitionsSwitch, buttonGlowSwitch, spinningArtworkSwitch, playWaveSwitch, visualizerSwitch, smoothScrollingSwitch, reduceMotionSwitch, s3, listeningTitle, focusSwitch, adBlockSwitch, version, author])
+        let reset = NSButton(title: "Восстановить стандартный дизайн", target: self, action: #selector(resetDesignSettings(_:)))
+        reset.bezelStyle = .rounded
+        let stack = NSStackView(views: [icon, name, subtitle, s1, designTitle, modernDesignSwitch, themeSwitch, roundedCardsSwitch, artworkHoverSwitch, compactModeSwitch, reset, s3, listeningTitle, focusSwitch, adBlockSwitch, version, author])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 11
+        stack.spacing = 10
         stack.edgeInsets = NSEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
@@ -316,11 +278,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         sidePanel.addSubview(scroll)
         sidePanel.addSubview(close)
 
-        sidePanelTrailing = sidePanel.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: 440)
+        sidePanelTrailing = sidePanel.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: 500)
         NSLayoutConstraint.activate([
             sidePanel.topAnchor.constraint(equalTo: root.topAnchor, constant: 94),
             sidePanel.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -18),
-            sidePanel.widthAnchor.constraint(equalToConstant: 410),
+            sidePanel.widthAnchor.constraint(equalToConstant: 470),
             sidePanelTrailing,
             scroll.topAnchor.constraint(equalTo: sidePanel.topAnchor),
             scroll.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor),
@@ -330,8 +292,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             stack.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
             stack.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
             stack.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 72),
-            icon.heightAnchor.constraint(equalToConstant: 72),
+            icon.widthAnchor.constraint(equalToConstant: 56),
+            icon.heightAnchor.constraint(equalToConstant: 56),
             close.topAnchor.constraint(equalTo: sidePanel.topAnchor, constant: 14),
             close.trailingAnchor.constraint(equalTo: sidePanel.trailingAnchor, constant: -14)
         ])
@@ -339,7 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     private func sectionLabel(_ title: String) -> NSTextField {
         let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        label.font = .systemFont(ofSize: 16, weight: .semibold)
         return label
     }
 
@@ -403,19 +365,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
     @objc private func toggleFocus(_ sender: NSButton) { focusEnabled = sender.state == .on; saveAndApply(DefaultsKey.focus, "focus", focusEnabled) }
     @objc private func toggleTheme(_ sender: NSButton) { themeEnabled = sender.state == .on; saveAndApply(DefaultsKey.theme, "theme", themeEnabled) }
-    @objc private func toggleAmbient(_ sender: NSButton) { ambientEnabled = sender.state == .on; saveAndApply(DefaultsKey.ambient, "ambient", ambientEnabled) }
-    @objc private func toggleVisualizer(_ sender: NSButton) { visualizerEnabled = sender.state == .on; saveAndApply(DefaultsKey.visualizer, "visualizer", visualizerEnabled) }
     @objc private func toggleModernDesign(_ sender: NSButton) { modernDesignEnabled = sender.state == .on; saveAndApply(DefaultsKey.modernDesign, "modernDesign", modernDesignEnabled) }
-    @objc private func toggleGlassPanels(_ sender: NSButton) { glassPanelsEnabled = sender.state == .on; saveAndApply(DefaultsKey.glassPanels, "glassPanels", glassPanelsEnabled) }
     @objc private func toggleRoundedCards(_ sender: NSButton) { roundedCardsEnabled = sender.state == .on; saveAndApply(DefaultsKey.roundedCards, "roundedCards", roundedCardsEnabled) }
-    @objc private func toggleHoverAnimations(_ sender: NSButton) { hoverAnimationsEnabled = sender.state == .on; saveAndApply(DefaultsKey.hoverAnimations, "hoverAnimations", hoverAnimationsEnabled) }
-    @objc private func togglePageTransitions(_ sender: NSButton) { pageTransitionsEnabled = sender.state == .on; saveAndApply(DefaultsKey.pageTransitions, "pageTransitions", pageTransitionsEnabled) }
-    @objc private func toggleButtonGlow(_ sender: NSButton) { buttonGlowEnabled = sender.state == .on; saveAndApply(DefaultsKey.buttonGlow, "buttonGlow", buttonGlowEnabled) }
-    @objc private func toggleSpinningArtwork(_ sender: NSButton) { spinningArtworkEnabled = sender.state == .on; saveAndApply(DefaultsKey.spinningArtwork, "spinningArtwork", spinningArtworkEnabled) }
-    @objc private func togglePlayWave(_ sender: NSButton) { playWaveEnabled = sender.state == .on; saveAndApply(DefaultsKey.playWave, "playWave", playWaveEnabled) }
+    @objc private func toggleArtworkHover(_ sender: NSButton) { artworkHoverEnabled = sender.state == .on; saveAndApply(DefaultsKey.artworkHover, "artworkHover", artworkHoverEnabled) }
     @objc private func toggleCompactMode(_ sender: NSButton) { compactModeEnabled = sender.state == .on; saveAndApply(DefaultsKey.compactMode, "compactMode", compactModeEnabled) }
-    @objc private func toggleSmoothScrolling(_ sender: NSButton) { smoothScrollingEnabled = sender.state == .on; saveAndApply(DefaultsKey.smoothScrolling, "smoothScrolling", smoothScrollingEnabled) }
-    @objc private func toggleReduceMotion(_ sender: NSButton) { reduceMotionEnabled = sender.state == .on; saveAndApply(DefaultsKey.reduceMotion, "reduceMotion", reduceMotionEnabled) }
+
+    @objc private func resetDesignSettings(_ sender: Any?) {
+        modernDesignEnabled = true
+        themeEnabled = true
+        roundedCardsEnabled = true
+        artworkHoverEnabled = true
+        compactModeEnabled = false
+        modernDesignSwitch.state = .on
+        themeSwitch.state = .on
+        roundedCardsSwitch.state = .on
+        artworkHoverSwitch.state = .on
+        compactModeSwitch.state = .off
+        let values: [(String, String, Bool)] = [
+            (DefaultsKey.modernDesign, "modernDesign", true),
+            (DefaultsKey.theme, "theme", true),
+            (DefaultsKey.roundedCards, "roundedCards", true),
+            (DefaultsKey.artworkHover, "artworkHover", true),
+            (DefaultsKey.compactMode, "compactMode", false)
+        ]
+        for (defaultsKey, jsKey, value) in values {
+            UserDefaults.standard.set(value, forKey: defaultsKey)
+            applySetting(jsKey, value: value)
+        }
+    }
     private func saveAndApply(_ key: String, _ jsKey: String, _ value: Bool) { UserDefaults.standard.set(value, forKey: key); applySetting(jsKey, value: value) }
 
     @objc private func toggleFocusFromMenu(_ sender: Any?) {
@@ -432,7 +409,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     @objc private func toggleInfoPanel(_ sender: Any?) {
         panelVisible.toggle()
-        sidePanelTrailing.constant = panelVisible ? -18 : 440
+        sidePanelTrailing.constant = panelVisible ? -18 : 500
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.25
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -445,8 +422,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         guard !defaults.bool(forKey: DefaultsKey.welcome) else { return }
         let alert = NSAlert()
         alert.icon = NSApp.applicationIconImage
-        alert.messageText = "DieCloude 3.5"
-        alert.informativeText = "Добавлена гибкая система оформления: современный дизайн, стеклянные панели, карточки, переходы, hover-эффекты, свечение, вращение обложки, волна Play, компактный режим и управление интенсивностью анимаций."
+        alert.messageText = "DieCloude 3.5.1"
+        alert.informativeText = "Исправлены только нижняя панель проигрывателя и скругление обложек. Остальной дизайн build 25 сохранён без изменений."
         alert.addButton(withTitle: "Начать слушать")
         alert.beginSheetModal(for: window) { _ in defaults.set(true, forKey: DefaultsKey.welcome) }
     }
@@ -530,151 +507,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     private func featureJavaScript() -> String {
-        let settings = "{adBlock:\(adBlockEnabled),focus:\(focusEnabled),theme:\(themeEnabled),ambient:\(ambientEnabled),visualizer:\(visualizerEnabled),modernDesign:\(modernDesignEnabled),glassPanels:\(glassPanelsEnabled),roundedCards:\(roundedCardsEnabled),hoverAnimations:\(hoverAnimationsEnabled),pageTransitions:\(pageTransitionsEnabled),buttonGlow:\(buttonGlowEnabled),spinningArtwork:\(spinningArtworkEnabled),playWave:\(playWaveEnabled),compactMode:\(compactModeEnabled),smoothScrolling:\(smoothScrollingEnabled),reduceMotion:\(reduceMotionEnabled)}"
-        return #"""
-        (() => {
-          const initial = __SETTINGS__;
-          if (window.__diecloude) { window.__diecloude.setAll(initial); return; }
-
-          const root = document.documentElement;
-          const dc = {
-            settings: initial,
-            observer: null,
-            frame: 0,
-            artworkTimer: 0,
-            lastArtwork: '',
-            adSelectors: '[class*=adBanner i],[class*=advertisement i],[class*=sponsored i],[class*=upsell i],[data-testid*=advert i],[data-testid*=upsell i],[aria-label*=advertisement i],[aria-label*=реклама i],iframe[src*=doubleclick],iframe[src*=googlesyndication]'
-          };
-
-          const style = document.createElement('style');
-          style.id = 'dc-style';
-          style.textContent = `
-            :root{--dc-accent:#ff5500;--dc-artwork:none}
-            html.dc-theme{accent-color:var(--dc-accent)}
-            html.dc-theme input[type=range],html.dc-theme input[type=checkbox]{accent-color:var(--dc-accent)!important}
-            #dc-ambient{position:fixed;inset:-50px;z-index:-1;pointer-events:none;opacity:0;transition:opacity .45s ease;background-image:linear-gradient(rgba(12,12,15,.86),rgba(12,12,15,.94)),var(--dc-artwork);background-size:cover;background-position:center;filter:blur(52px) saturate(1.08);transform:scale(1.04)}
-            html.dc-ambient #dc-ambient{opacity:.22}
-            html.dc-ambient body{isolation:isolate;background-color:#111114!important}html.dc-ambient body>*:not(#dc-ambient):not(#dc-visualizer){position:relative;z-index:1}
-            html.dc-focus [class*=sidebar],html.dc-focus [class*=related],html.dc-focus [class*=comments],html.dc-focus [class*=commentForm],html.dc-focus [class*=rightSidebar],html.dc-focus [class*=streamSidebar],html.dc-focus aside{display:none!important}
-            html.dc-focus [class*=l-fluid-fixed],html.dc-focus [class*=l-container],html.dc-focus main{max-width:1120px!important;margin-left:auto!important;margin-right:auto!important}
-            html.dc-adblock ${dc.adSelectors}{display:none!important;visibility:hidden!important;max-height:0!important}
-            #dc-visualizer{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:2147483640;display:none;align-items:flex-end;gap:4px;height:34px;padding:7px 11px;border-radius:17px;background:rgba(12,12,14,.42);backdrop-filter:blur(14px);pointer-events:none}
-            html.dc-visualizer #dc-visualizer{display:flex}#dc-visualizer i{display:block;width:4px;height:7px;border-radius:4px;background:var(--dc-accent);animation:dcbar .95s ease-in-out infinite alternate;animation-play-state:paused}html.dc-playing #dc-visualizer i{animation-play-state:running}
-            #dc-visualizer i:nth-child(2n){animation-duration:.72s}#dc-visualizer i:nth-child(3n){animation-duration:1.15s}@keyframes dcbar{from{height:5px;opacity:.55}to{height:30px;opacity:1}}
-            html.dc-modern{color-scheme:dark}html.dc-modern .header,html.dc-modern .playControls,html.dc-modern .playControls__inner{border-color:rgba(255,255,255,.07)!important}
-            html.dc-glass .header,html.dc-glass .playControls,html.dc-glass .playControls__inner,html.dc-glass [role=dialog]{background-color:rgba(20,20,24,.90)!important;backdrop-filter:blur(14px) saturate(1.08)!important;-webkit-backdrop-filter:blur(14px) saturate(1.08)!important}
-            html.dc-rounded .soundList__item,html.dc-rounded .trackItem,html.dc-rounded .systemPlaylist,html.dc-rounded .soundBadge{border-radius:12px!important}
-            html.dc-hover .soundList__item,html.dc-hover .trackItem,html.dc-hover .soundBadge{transition:transform .18s ease,box-shadow .18s ease!important}html.dc-hover .soundList__item:hover,html.dc-hover .trackItem:hover,html.dc-hover .soundBadge:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.22)}
-            html.dc-transitions main{animation:dcPageIn .22s ease both}@keyframes dcPageIn{from{opacity:.25;transform:translateY(6px)}to{opacity:1;transform:none}}
-            html.dc-glow button[title*=Play i],html.dc-glow button[aria-label*=Play i],html.dc-glow button[title*=Воспроизвести i],html.dc-glow button[aria-label*=Воспроизвести i]{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--dc-accent),transparent 30%))}
-            html.dc-spin.dc-playing [class*=playbackSoundBadge] img,html.dc-spin.dc-playing [class*=playbackSoundBadge] [style*=background-image]{border-radius:50%!important;animation:dcSpin 14s linear infinite!important}@keyframes dcSpin{to{transform:rotate(360deg)}}
-            html.dc-wave button[title*=Play i]::after,html.dc-wave button[aria-label*=Play i]::after{content:'';position:absolute;inset:-5px;border:2px solid var(--dc-accent);border-radius:50%;opacity:0;animation:dcWave 1.8s ease-out infinite;pointer-events:none}@keyframes dcWave{0%{transform:scale(.7);opacity:.65}100%{transform:scale(1.45);opacity:0}}
-            html.dc-compact .soundList__item,html.dc-compact .trackItem{padding-top:6px!important;padding-bottom:6px!important}html.dc-compact .soundBadge__avatar,html.dc-compact .sound__coverArt{max-width:88px!important;max-height:88px!important}
-            html.dc-smooth{scroll-behavior:smooth!important}html.dc-smooth *{scroll-behavior:smooth!important}
-            html.dc-reduced *,html.dc-reduced *::before,html.dc-reduced *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
-            @media (prefers-reduced-motion:reduce){#dc-visualizer i{animation:none!important;height:10px}html *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
-          `;
-          (document.head || root).appendChild(style);
-
-          const ambient = document.createElement('div'); ambient.id = 'dc-ambient';
-          const viz = document.createElement('div'); viz.id = 'dc-visualizer'; viz.innerHTML = '<i></i>'.repeat(12);
-          (document.body || root).prepend(ambient);
-          (document.body || root).appendChild(viz);
-
-          const visible = element => element?.isConnected && element.getClientRects().length > 0;
-          const media = () => document.querySelector('audio:not([paused]),video:not([paused])') || document.querySelector('audio,video');
-          const updatePlaying = () => {
-            const item = media();
-            root.classList.toggle('dc-playing', !!item && !item.paused && !document.hidden);
-          };
-
-          const removeAdsFrom = node => {
-            if (!dc.settings.adBlock || !(node instanceof Element)) return;
-            if (node.matches(dc.adSelectors)) { node.remove(); return; }
-            node.querySelectorAll(dc.adSelectors).forEach(element => element.remove());
-          };
-
-          const updateArtwork = () => {
-            dc.artworkTimer = 0;
-            if (!dc.settings.theme && !dc.settings.ambient) return;
-            let best = null, bestArea = 0;
-            for (const image of document.images) {
-              if (!visible(image) || image.naturalWidth < 200 || image.naturalHeight < 200) continue;
-              const area = image.clientWidth * image.clientHeight;
-              if (area > bestArea) { best = image; bestArea = area; }
-            }
-            const url = best?.currentSrc || '';
-            if (!url || url === dc.lastArtwork) return;
-            dc.lastArtwork = url;
-            root.style.setProperty('--dc-artwork', `url("${url.replaceAll('"','%22')}")`);
-            if (dc.settings.theme) {
-              let hash = 0;
-              for (const character of url) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-              root.style.setProperty('--dc-accent', `hsl(${hash % 360} 78% 58%)`);
-            }
-          };
-
-          const scheduleArtwork = () => {
-            if (dc.artworkTimer) return;
-            dc.artworkTimer = window.setTimeout(updateArtwork, 700);
-          };
-
-          const applyClasses = () => {
-            root.classList.toggle('dc-adblock', !!dc.settings.adBlock);
-            root.classList.toggle('dc-focus', !!dc.settings.focus);
-            root.classList.toggle('dc-theme', !!dc.settings.theme);
-            root.classList.toggle('dc-ambient', !!dc.settings.ambient);
-            root.classList.toggle('dc-visualizer', !!dc.settings.visualizer);
-            root.classList.toggle('dc-modern', !!dc.settings.modernDesign);
-            root.classList.toggle('dc-glass', !!dc.settings.glassPanels);
-            root.classList.toggle('dc-rounded', !!dc.settings.roundedCards);
-            root.classList.toggle('dc-hover', !!dc.settings.hoverAnimations && !dc.settings.reduceMotion);
-            root.classList.toggle('dc-transitions', !!dc.settings.pageTransitions && !dc.settings.reduceMotion);
-            root.classList.toggle('dc-glow', !!dc.settings.buttonGlow);
-            root.classList.toggle('dc-spin', !!dc.settings.spinningArtwork && !dc.settings.reduceMotion);
-            root.classList.toggle('dc-wave', !!dc.settings.playWave && !dc.settings.reduceMotion);
-            root.classList.toggle('dc-compact', !!dc.settings.compactMode);
-            root.classList.toggle('dc-smooth', !!dc.settings.smoothScrolling && !dc.settings.reduceMotion);
-            root.classList.toggle('dc-reduced', !!dc.settings.reduceMotion);
-            updatePlaying();
-            scheduleArtwork();
-          };
-
-          const scheduleApply = () => {
-            if (dc.frame) return;
-            dc.frame = requestAnimationFrame(() => { dc.frame = 0; applyClasses(); });
-          };
-
-          dc.set = (key, value) => { dc.settings[key] = !!value; applyClasses(); if (key === 'adBlock' && value) removeAdsFrom(document.body); };
-          dc.setAll = values => { Object.assign(dc.settings, values || {}); applyClasses(); if (dc.settings.adBlock) removeAdsFrom(document.body); };
-          window.__diecloude = dc;
-
-          dc.observer = new MutationObserver(records => {
-            let needsArtwork = false;
-            for (const record of records) {
-              for (const node of record.addedNodes) {
-                removeAdsFrom(node);
-                if (node instanceof HTMLImageElement || node.querySelector?.('img')) needsArtwork = true;
-              }
-            }
-            if (needsArtwork) scheduleArtwork();
-            scheduleApply();
-          });
-          dc.observer.observe(document.body || root, { subtree: true, childList: true });
-
-          document.addEventListener('play', updatePlaying, true);
-          document.addEventListener('pause', updatePlaying, true);
-          document.addEventListener('visibilitychange', updatePlaying);
-          window.addEventListener('pagehide', () => {
-            dc.observer?.disconnect();
-            if (dc.frame) cancelAnimationFrame(dc.frame);
-            if (dc.artworkTimer) clearTimeout(dc.artworkTimer);
-          }, { once: true });
-
-          if (dc.settings.adBlock) removeAdsFrom(document.body);
-          applyClasses();
-        })();
-        """#.replacingOccurrences(of: "__SETTINGS__", with: settings)
+        let settings = "{adBlock:\(adBlockEnabled),focus:\(focusEnabled),theme:\(themeEnabled),modernDesign:\(modernDesignEnabled),roundedCards:\(roundedCardsEnabled),artworkHover:\(artworkHoverEnabled),compactMode:\(compactModeEnabled)}"
+        guard let url = Bundle.main.url(forResource: "theme-engine", withExtension: "js"),
+              let source = try? String(contentsOf: url, encoding: .utf8) else {
+            NSLog("DieCloude: resources/theme-engine.js not found")
+            return "window.__diecloudeThemeEngineError = 'theme-engine.js missing';"
+        }
+        return source.replacingOccurrences(of: "__SETTINGS__", with: settings)
     }
 
     deinit {
