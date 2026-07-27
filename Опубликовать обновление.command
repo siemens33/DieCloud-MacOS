@@ -103,6 +103,34 @@ if f'## {version} ' not in old:
     else:
         old = '# История изменений\n' + entry + old
     changelog.write_text(old, encoding='utf-8')
+
+readme = Path('README.md')
+if readme.exists():
+    text = readme.read_text(encoding='utf-8')
+    text = re.sub(
+        r'\*\*Текущая версия: [0-9]+\.[0-9]+\.[0-9]+ \(сборка [0-9]+\)\*\*',
+        f'**Текущая версия: {version} (сборка {int(Path("Info.plist").read_text(encoding="utf-8").split("<key>CFBundleVersion</key>",1)[1].split("<string>",1)[1].split("</string>",1)[0])})**',
+        text,
+        count=1,
+    )
+    whats_new = f'## Что нового в версии {version}\n\n- {notes.strip()}\n\n'
+    text, count = re.subn(
+        r'## Что нового в версии [0-9]+\.[0-9]+\.[0-9]+\n.*?(?=\n## )',
+        whats_new.rstrip(),
+        text,
+        count=1,
+        flags=re.S,
+    )
+    if count == 0:
+        marker = '## О приложении\n'
+        text = text.replace(marker, whats_new + marker, 1)
+    readme.write_text(text, encoding='utf-8')
+
+Path('RELEASE_NOTES.md').write_text(
+    f'# DieCloude {version}\n\n## Что изменилось\n\n- {notes.strip()}\n\n'
+    '## Скачать\n\nИспользуй файл `DieCloude.dmg` из раздела Assets.\n',
+    encoding='utf-8',
+)
 PY
 
 plutil -lint Info.plist >/dev/null
