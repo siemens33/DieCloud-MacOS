@@ -3,6 +3,7 @@
 DieCloude optionally downloads and bundles the official Xray-core executable during local build.
 
 - Project: XTLS/Xray-core
+- Version bundled in DieCloude 4.0.0: v26.3.27
 - Source: https://github.com/XTLS/Xray-core
 - License: Mozilla Public License 2.0 (see the LICENSE file included in the official Xray release archive)
 - DieCloude starts Xray as a separate local process and communicates through a localhost HTTP proxy.

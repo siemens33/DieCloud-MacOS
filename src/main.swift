@@ -5,7 +5,8 @@ import Network
 
 enum AppConfig {
     static let name = "DieCloude"
-    static let version = "3.5.2"
+    static let version = "4.0.0"
+    static let build = "32"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
@@ -20,8 +21,8 @@ private enum DefaultsKey {
     static let roundedCards = "DieCloudeRoundedCardsEnabled"
     static let artworkHover = "DieCloudeArtworkHoverEnabled"
     static let compactMode = "DieCloudeCompactModeEnabled"
-    static let welcome = "DieCloudeWelcomeV352PolishShown"
-    static let darkThemeFix = "DieCloudeVisualSystemV352Build29"
+    static let welcome = "DieCloudeWelcomeV400Shown"
+    static let darkThemeFix = "DieCloudeVisualSystemV400Build31"
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
@@ -33,7 +34,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private var titleLabel: NSTextField!
     private var sidePanel: NSVisualEffectView!
     private var sidePanelTrailing: NSLayoutConstraint!
-    private var keyMonitor: Any?
     private var observations: [NSKeyValueObservation] = []
     private var adBlockRuleList: WKContentRuleList?
     private var vpnController: VPNWindowController?
@@ -61,8 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let defaults = UserDefaults.standard
 
-        // 3.5.2 visual polish migration: preserve the stable theme and enable
-        // corrected artwork rounding plus lightweight interface animations.
+        // 4.0 migration: macOS 14+, Cmd+, вместо F1, новый noAds V8.
         if !defaults.bool(forKey: DefaultsKey.darkThemeFix) {
             defaults.set(true, forKey: DefaultsKey.modernDesign)
             defaults.set(false, forKey: DefaultsKey.glassPanels)
@@ -84,7 +83,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         buildMenu()
         buildWindow()
         compileAdBlockRules()
-        installF1Handler()
         loadHome(nil)
         NSApp.activate(ignoringOtherApps: true)
         showWelcomeIfNeeded()
@@ -98,6 +96,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let appItem = NSMenuItem()
         let appMenu = NSMenu(title: AppConfig.name)
         appMenu.addItem(withTitle: "О программе \(AppConfig.name)", action: #selector(toggleInfoPanel(_:)), keyEquivalent: "")
+        // Стандартный macOS-хоткей настроек: Cmd+, (вместо F1)
+        let prefs = NSMenuItem(title: "Настройки…", action: #selector(toggleInfoPanel(_:)), keyEquivalent: ",")
+        prefs.keyEquivalentModifierMask = .command
+        appMenu.addItem(prefs)
         appMenu.addItem(withTitle: "Проверить обновления…", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Скрыть \(AppConfig.name)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -114,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         viewMenu.addItem(withTitle: "Домой", action: #selector(loadHome(_:)), keyEquivalent: "0")
         viewMenu.addItem(.separator())
         viewMenu.addItem(withTitle: "Focus Mode", action: #selector(toggleFocusFromMenu(_:)), keyEquivalent: "")
-        viewMenu.addItem(withTitle: "Настройки (F1)", action: #selector(toggleInfoPanel(_:)), keyEquivalent: "")
+        viewMenu.addItem(withTitle: "Настройки (⌘,)", action: #selector(toggleInfoPanel(_:)), keyEquivalent: "")
         viewItem.submenu = viewMenu
         mainMenu.addItem(viewItem)
         NSApp.mainMenu = mainMenu
@@ -129,7 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         window.title = AppConfig.name
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        if #available(macOS 11.0, *) { window.toolbarStyle = .unified }
+        window.toolbarStyle = .unified
         window.minSize = AppConfig.minSize
         window.collectionBehavior = [.fullScreenPrimary]
         window.center()
@@ -151,7 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let reload = symbolButton("arrow.clockwise", action: #selector(reloadPage(_:)), tooltip: "Обновить")
         let home = symbolButton("house.fill", action: #selector(loadHome(_:)), tooltip: "Домой")
         let vpn = symbolButton("lock.shield.fill", action: #selector(openVPN(_:)), tooltip: "VPN — только DieCloude")
-        let info = symbolButton("slider.horizontal.3", action: #selector(toggleInfoPanel(_:)), tooltip: "Настройки (F1)")
+        let info = symbolButton("slider.horizontal.3", action: #selector(toggleInfoPanel(_:)), tooltip: "Настройки (⌘,)")
 
         titleLabel = NSTextField(labelWithString: AppConfig.name)
         titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -174,7 +176,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
+        // macOS 14, меньше нагрева: общий processPool, без авто-проигрывания рекламы
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        if #available(macOS 14.0, *) {
+            configuration.preferences.isElementFullscreenEnabled = true
+        }
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.userContentController.addUserScript(
             WKUserScript(source: featureJavaScript(), injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
@@ -340,25 +347,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     private func compileAdBlockRules() {
-        let rules = #"[{"trigger":{"url-filter":".*(doubleclick\\.net|googlesyndication\\.com|googleadservices\\.com|amazon-adsystem\\.com|scorecardresearch\\.com|adnxs\\.com|criteo\\.com|taboola\\.com|outbrain\\.com|adsrvr\\.org|quantserve\\.com|rubiconproject\\.com|pubmatic\\.com|openx\\.net|moatads\\.com|demdex\\.net|everesttech\\.net).*","resource-type":["document","image","style-sheet","script","font","raw","popup"]},"action":{"type":"block"}}]"#
-        WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "DieCloudeAdBlockRulesV6", encodedContentRuleList: rules) { [weak self] list, error in
+        // 4.0: V8 — network-правила из AdBlockService + DOM-чистка в theme-engine.js
+        AdBlockService.compile { [weak self] list in
             DispatchQueue.main.async {
                 guard let self else { return }
-                if let error { NSLog("DieCloude ad-block rules error: \(error)"); return }
                 self.adBlockRuleList = list
-                if self.adBlockEnabled, let list { self.webView.configuration.userContentController.add(list) }
+                if self.adBlockEnabled, let list {
+                    self.webView.configuration.userContentController.add(list)
+                }
             }
         }
     }
 
     private func applySetting(_ name: String, value: Bool, reload: Bool = false) {
-        webView.evaluateJavaScript("window.__diecloude?.set('\(name)', \(value ? "true" : "false"))")
+        // Безопасная передача без строковой интерполяции
+        let payload = (try? JSONSerialization.data(withJSONObject: [name: value])) ?? Data()
+        let json = String(data: payload, encoding: .utf8) ?? "{}"
+        webView.evaluateJavaScript("window.__diecloude?.setAll(\(json))")
         if reload { webView.reload() }
     }
 
     @objc private func toggleAdBlock(_ sender: NSButton) {
         adBlockEnabled = sender.state == .on
         UserDefaults.standard.set(adBlockEnabled, forKey: DefaultsKey.adBlock)
+        // WKUserContentController хранит только наш V8-лист — пересобираем чисто
         webView.configuration.userContentController.removeAllContentRuleLists()
         if adBlockEnabled, let adBlockRuleList { webView.configuration.userContentController.add(adBlockRuleList) }
         applySetting("adBlock", value: adBlockEnabled, reload: true)
@@ -399,14 +411,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         focusEnabled.toggle(); focusSwitch.state = focusEnabled ? .on : .off; saveAndApply(DefaultsKey.focus, "focus", focusEnabled)
     }
 
-    private func installF1Handler() {
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
-            if event.keyCode == 122 { self.toggleInfoPanel(nil); return nil }
-            return event
-        }
-    }
-
     @objc private func toggleInfoPanel(_ sender: Any?) {
         panelVisible.toggle()
         sidePanelTrailing.constant = panelVisible ? -18 : 500
@@ -422,10 +426,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         guard !defaults.bool(forKey: DefaultsKey.welcome) else { return }
         let alert = NSAlert()
         alert.icon = NSApp.applicationIconImage
-        alert.messageText = "DieCloude 3.5.2"
-        alert.informativeText = "Обновлённый матовый плеер, исправленные скругления обложек и лёгкие надёжные анимации интерфейса."
+        alert.messageText = "DieCloude \(AppConfig.version)"
+        alert.informativeText = bundledReleaseNotes()
         alert.addButton(withTitle: "Начать слушать")
-        alert.beginSheetModal(for: window) { _ in defaults.set(true, forKey: DefaultsKey.welcome) }
+        alert.addButton(withTitle: "Подробнее")
+        alert.beginSheetModal(for: window) { response in
+            defaults.set(true, forKey: DefaultsKey.welcome)
+            if response == .alertSecondButtonReturn {
+                if let url = URL(string: "https://github.com/siemens33/DieCloud-MacOS/releases/latest") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
+    }
+
+    private func bundledReleaseNotes() -> String {
+        if let url = Bundle.main.url(forResource: "RELEASE_NOTES", withExtension: "md"),
+           let text = try? String(contentsOf: url, encoding: .utf8) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return String(trimmed.prefix(1200)) }
+        }
+        return "macOS 14+, новый noAds V8, Xray обновлён, настройки теперь по ⌘,."
     }
 
 
@@ -463,9 +484,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     private func applyPerAppProxy(enabled: Bool, port: Int) {
-        guard #available(macOS 14.0, *) else {
-            let alert = NSAlert(); alert.messageText = "Для встроенного VPN нужна macOS 14 или новее"; alert.informativeText = "Сам DieCloude продолжает работать на macOS 12–13, но публичный WebKit API для отдельного прокси доступен только в новых версиях macOS."; alert.runModal(); XrayManager.shared.stop(); return
-        }
+        // macOS 14+ — единственный поддерживаемый таргет 4.0
         let store = webView.configuration.websiteDataStore
         if enabled {
             let endpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: UInt16(port))!)
@@ -507,7 +526,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     private func featureJavaScript() -> String {
-        let settings = "{adBlock:\(adBlockEnabled),focus:\(focusEnabled),theme:\(themeEnabled),modernDesign:\(modernDesignEnabled),roundedCards:\(roundedCardsEnabled),artworkHover:\(artworkHoverEnabled),compactMode:\(compactModeEnabled)}"
+        let dict: [String: Bool] = ["adBlock": adBlockEnabled, "focus": focusEnabled, "theme": themeEnabled, "modernDesign": modernDesignEnabled, "roundedCards": roundedCardsEnabled, "artworkHover": artworkHoverEnabled, "compactMode": compactModeEnabled]
+        let data = (try? JSONSerialization.data(withJSONObject: dict)) ?? Data("{}\n".utf8)
+        let settings = String(data: data, encoding: .utf8) ?? "{}"
         guard let url = Bundle.main.url(forResource: "theme-engine", withExtension: "js"),
               let source = try? String(contentsOf: url, encoding: .utf8) else {
             NSLog("DieCloude: resources/theme-engine.js not found")
@@ -517,7 +538,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     deinit {
-        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         observations.removeAll()
     }
 }

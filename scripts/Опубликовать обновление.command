@@ -3,15 +3,21 @@ set -euo pipefail
 
 REPO_URL="https://github.com/siemens33/DieCloud-MacOS.git"
 REPO_WEB="https://github.com/siemens33/DieCloud-MacOS"
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-cd "$ROOT"
+# Папка скриптов -> корень репозитория (работает и из scripts/, и из корня).
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "$SCRIPT_DIR/../Info.plist" ]]; then
+  REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+  REPO_ROOT="$SCRIPT_DIR"
+fi
+cd "$REPO_ROOT"
 
 pause_on_error() {
   local code=$?
   echo ""
   echo "❌ Публикация остановлена (код $code)."
   echo "Окно не закроется автоматически — текст ошибки можно скопировать."
-  read -k 1 '?Нажми любую клавишу, чтобы закрыть окно.'
+  read -k 1 '?Нажми любую клавишу, чтобы закрыть окно.' || true
   exit "$code"
 }
 trap pause_on_error ERR
@@ -61,6 +67,7 @@ VERSION="$CURRENT"
 # Если текущая версия уже опубликована, автоматически повышаем patch: X.Y.Z → X.Y.(Z+1).
 if git show-ref --verify --quiet "refs/tags/v$VERSION" || gh release view "v$VERSION" --repo siemens33/DieCloud-MacOS >/dev/null 2>&1; then
   IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+  MAJOR=${MAJOR:-0}; MINOR=${MINOR:-0}; PATCH=${PATCH:-0}
   VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
 fi
 NEW_BUILD=$((BUILD + 1))
@@ -68,22 +75,23 @@ NEW_BUILD=$((BUILD + 1))
 echo "Текущая версия проекта: $CURRENT (сборка $BUILD)"
 echo "Будет опубликована:      $VERSION (сборка $NEW_BUILD)"
 printf 'Описание изменений (Enter — «Оптимизация и исправления»): '
-read NOTES
-[[ -n "$NOTES" ]] || NOTES='Оптимизация и исправления'
+NOTES=""
+read -r NOTES || true
+[[ -n "${NOTES//[[:space:]]/}" ]] || NOTES='Оптимизация и исправления'
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Info.plist
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" Info.plist
 
-python3 - "$VERSION" "$NOTES" <<'PY'
-from datetime import date
-from pathlib import Path
+python3 - "$VERSION" "$NEW_BUILD" "$NOTES" <<'PY'
 import re
 import sys
+from pathlib import Path
 
-version, notes = sys.argv[1], sys.argv[2]
+version, new_build, notes = sys.argv[1], sys.argv[2], sys.argv[3]
 
 replacements = [
     (Path('src/main.swift'), r'static let version = "[0-9]+\.[0-9]+\.[0-9]+"', f'static let version = "{version}"'),
+    (Path('src/main.swift'), r'static let build = "[0-9]+"', f'static let build = "{new_build}"'),
     (Path('package-dmg.sh'), r'^VERSION="[0-9]+\.[0-9]+\.[0-9]+"$', f'VERSION="{version}"'),
 ]
 for path, pattern, replacement in replacements:
@@ -95,8 +103,8 @@ for path, pattern, replacement in replacements:
 
 changelog = Path('CHANGELOG.md')
 old = changelog.read_text(encoding='utf-8') if changelog.exists() else '# История изменений\n'
-entry = f'\n## {version} — {date.today().isoformat()}\n\n- {notes.strip()}\n'
-if f'## {version} ' not in old:
+entry = f'\n## {version} — build {new_build}\n\n- {notes.strip()}\n'
+if f'## {version} ' not in old and f'## {version}\n' not in old:
     if old.startswith('#'):
         first_line, _, rest = old.partition('\n')
         old = first_line + '\n' + entry + rest.lstrip('\n')
@@ -107,23 +115,26 @@ if f'## {version} ' not in old:
 readme = Path('README.md')
 if readme.exists():
     text = readme.read_text(encoding='utf-8')
-    text = re.sub(
-        r'\*\*Текущая версия: [0-9]+\.[0-9]+\.[0-9]+ \(сборка [0-9]+\)\*\*',
-        f'**Текущая версия: {version} (сборка {int(Path("Info.plist").read_text(encoding="utf-8").split("<key>CFBundleVersion</key>",1)[1].split("<string>",1)[1].split("</string>",1)[0])})**',
+    # Актуальный формат: **Версия 4.0.0 · сборка 31 · macOS 14+**
+    text, vcount = re.subn(
+        r'(\*\*Версия )[0-9]+\.[0-9]+\.[0-9]+( · сборка )[0-9]+( · macOS .*?\*\*)',
+        rf'\g<1>{version}\g<2>{new_build}\g<3>',
         text,
         count=1,
     )
-    whats_new = f'## Что нового в версии {version}\n\n- {notes.strip()}\n\n'
+    whats_new = f'## Что нового в {version}\n\n- {notes.strip()}\n'
     text, count = re.subn(
-        r'## Что нового в версии [0-9]+\.[0-9]+\.[0-9]+\n.*?(?=\n## )',
+        r'## Что нового в [0-9]+\.[0-9]+\.[0-9]+\n.*?(?=\n## )',
         whats_new.rstrip(),
         text,
         count=1,
         flags=re.S,
     )
     if count == 0:
-        marker = '## О приложении\n'
-        text = text.replace(marker, whats_new + marker, 1)
+        if '</div>' in text:
+            text = text.replace('</div>', '</div>\n\n' + whats_new, 1)
+        else:
+            text = whats_new + '\n' + text
     readme.write_text(text, encoding='utf-8')
 
 Path('RELEASE_NOTES.md').write_text(
@@ -134,7 +145,14 @@ Path('RELEASE_NOTES.md').write_text(
 PY
 
 plutil -lint Info.plist >/dev/null
-zsh -n build.sh package-dmg.sh "Опубликовать обновление.command"
+# Проверка синтаксиса каждого файла отдельно (zsh -n принимает один файл).
+zsh -n build.sh
+zsh -n package-dmg.sh
+if [[ -f "scripts/Опубликовать обновление.command" ]]; then
+  zsh -n "scripts/Опубликовать обновление.command"
+elif [[ -f "Опубликовать обновление.command" ]]; then
+  zsh -n "Опубликовать обновление.command"
+fi
 
 # Не создаём пустой релиз.
 if [[ -z "$(git status --porcelain)" ]]; then
@@ -177,4 +195,4 @@ else
 fi
 
 trap - ERR
-read -k 1 '?Нажми любую клавишу, чтобы закрыть окно.'
+read -k 1 '?Нажми любую клавишу, чтобы закрыть окно.' || true

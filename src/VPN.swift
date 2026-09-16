@@ -23,7 +23,9 @@ final class KeychainStore {
         SecItemDelete(base as CFDictionary)
         var item = base
         item[kSecValueData as String] = data
-        SecItemAdd(item as CFDictionary, nil)
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+        let status = SecItemAdd(item as CFDictionary, nil)
+        if status != errSecSuccess { NSLog("DieCloude keychain save error: \(status)") }
     }
     static func load(account: String) -> String? {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
@@ -89,7 +91,11 @@ final class XrayManager {
     var isRunning: Bool { process?.isRunning == true }
 
     func stop() {
-        process?.terminate()
+        if let p = process, p.isRunning { p.terminate() }
+        // Даём 0.3с на graceful shutdown, затем убиваем
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            if self?.process?.isRunning == true { self?.process?.interrupt() }
+        }
         process = nil
         try? FileManager.default.removeItem(at: configURL)
     }
@@ -101,15 +107,44 @@ final class XrayManager {
             throw NSError(domain: "DieCloudeVPN", code: 1, userInfo: [NSLocalizedDescriptionKey: "Ядро Xray не найдено в приложении. Пересобери DieCloude при подключённом интернете."])
         }
         let config = try makeConfig(server)
-        try config.write(to: configURL, options: .atomic)
+        try config.write(to: configURL, options: [.atomic])
+        // 0600 — в конфиге UUID/пароль
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: configURL.path)
         let task = Process()
         task.executableURL = binary
         task.arguments = ["run", "-config", configURL.path]
         task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice
+        // Меньше нагрева: низкий QoS для фонового прокси-процесса
+        task.qualityOfService = .utility
         try task.run()
         process = task
-        Thread.sleep(forTimeInterval: 0.35)
-        if !task.isRunning { throw NSError(domain: "DieCloudeVPN", code: 2, userInfo: [NSLocalizedDescriptionKey: "Xray не смог запуститься с выбранной конфигурацией."]) }
+        // Healthcheck вместо Thread.sleep: ждём порт до 2с
+        if !waitForPort(port: localPort, timeout: 2.0) || !task.isRunning {
+            stop()
+            throw NSError(domain: "DieCloudeVPN", code: 2, userInfo: [NSLocalizedDescriptionKey: "Xray не смог запуститься с выбранной конфигурацией."])
+        }
+    }
+
+    private func waitForPort(port: Int, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let fd: Int32 = socket(AF_INET, SOCK_STREAM, 0)
+            if fd < 0 { return false }
+            var addr = sockaddr_in()
+            addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+            addr.sin_family = sa_family_t(AF_INET)
+            addr.sin_port = UInt16(port).bigEndian
+            addr.sin_addr = in_addr(s_addr: 0x0100007F) // 127.0.0.1
+            let result = withUnsafePointer(to: &addr) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
+            }
+            close(fd)
+            if result == 0 { return true }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return false
     }
 
     private var configURL: URL { FileManager.default.temporaryDirectory.appendingPathComponent("diecloude-xray.json") }
@@ -219,7 +254,21 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
         let key = keyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines); guard !key.isEmpty else { setStatus("Вставь ключ или ссылку подписки") ; return }
         KeychainStore.save(key, account: "happ-subscription"); setStatus("Обновление…")
         if let url = URL(string:key), ["http","https"].contains(url.scheme?.lowercased() ?? "") {
-            URLSession.shared.dataTask(with:url) { [weak self] data,_,error in DispatchQueue.main.async { guard let self else{return}; if let error { self.setStatus(error.localizedDescription); return }; self.loadServers(from: SubscriptionParser.decodeText(data ?? Data())) } }.resume()
+            var req = URLRequest(url: url, timeoutInterval: 15)
+            req.setValue("DieCloude/4.0.0", forHTTPHeaderField: "User-Agent")
+            URLSession.shared.dataTask(with:req) { [weak self] data, response, error in
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if let error { self.setStatus(error.localizedDescription); return }
+                    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                        self.setStatus("Сервер подписки вернул ошибку"); return
+                    }
+                    guard let data, data.count < 2_000_000 else {
+                        self.setStatus("Подписка слишком большая"); return
+                    }
+                    self.loadServers(from: SubscriptionParser.decodeText(data))
+                }
+            }.resume()
         } else { loadServers(from: SubscriptionParser.decodeText(Data(key.utf8))) }
     }
 
@@ -234,12 +283,25 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
     @objc private func pingAll() {
         guard !servers.isEmpty else { refreshKey(); return }
         setStatus("Проверка задержки…")
-        for index in servers.indices { measure(index:index) }
+        // Лимит параллелизма: не греем сеть/CPU, максимум 6 одновременно
+        let group = DispatchGroup()
+        let semaphore = DispatchSemaphore(value: 6)
+        for index in servers.indices {
+            group.enter()
+            DispatchQueue.global(qos: .utility).async {
+                semaphore.wait()
+                self.measure(index: index) {
+                    semaphore.signal()
+                    group.leave()
+                }
+            }
+        }
+        group.notify(queue: .main) { [weak self] in self?.setStatus("Проверка завершена") }
     }
 
-    private func measure(index: Int) {
+    private func measure(index: Int, done: @escaping () -> Void) {
         guard index < servers.count,
-              let port = NWEndpoint.Port(rawValue: UInt16(servers[index].port)) else { return }
+              let port = NWEndpoint.Port(rawValue: UInt16(servers[index].port)) else { done(); return }
         let server = servers[index]
         let queue = DispatchQueue(label: "DieCloude.Ping.\(index)", qos: .utility)
         let connection = NWConnection(host: NWEndpoint.Host(server.host), port: port, using: .tcp)
@@ -251,10 +313,10 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
             finished = true
             connection.cancel()
             DispatchQueue.main.async { [weak self] in
-                guard let self, index < self.servers.count else { return }
+                guard let self, index < self.servers.count else { done(); return }
                 self.servers[index].pingMS = value
                 self.table.reloadData(forRowIndexes: IndexSet(integer: index), columnIndexes: IndexSet(integersIn: 0..<self.table.numberOfColumns))
-                if self.servers.allSatisfy({ $0.pingMS != nil }) { self.setStatus("Проверка завершена") }
+                done()
             }
         }
 
@@ -285,7 +347,6 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
 
     func attemptAutoConnect() {
         guard UserDefaults.standard.bool(forKey: VPNDefaults.autoConnect) else { return }
-        guard #available(macOS 14.0, *) else { return }
         if servers.isEmpty { restoreState() }
         guard let raw = UserDefaults.standard.string(forKey: VPNDefaults.selectedURI),
               let server = servers.first(where: { $0.rawURI == raw }) else { return }

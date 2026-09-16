@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$ROOT/build"
 APP="$BUILD/DieCloude.app"
-VERSION="3.5.2"
+VERSION="4.0.0"
 DMG="$BUILD/DieCloude-$VERSION.dmg"
 STAGE="$BUILD/dmg-stage"
 
@@ -14,7 +14,12 @@ rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/DieCloude.app"
 ln -s /Applications "$STAGE/Программы"
-cp "$ROOT/Первый запуск DieCloude.command" "$STAGE/Первый запуск DieCloude.command"
+# Первый запуск лежит в scripts/, со fallback на корень для старых checkout.
+if [[ -f "$ROOT/scripts/Первый запуск DieCloude.command" ]]; then
+  cp "$ROOT/scripts/Первый запуск DieCloude.command" "$STAGE/Первый запуск DieCloude.command"
+else
+  cp "$ROOT/Первый запуск DieCloude.command" "$STAGE/Первый запуск DieCloude.command"
+fi
 chmod 755 "$STAGE/Первый запуск DieCloude.command"
 
 # Создаёт стандартный установочный образ macOS.

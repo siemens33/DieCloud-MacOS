@@ -1,0 +1,471 @@
+[
+  {
+    "trigger": {
+      "url-filter": ".*doubleclick\\.net.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*googlesyndication\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*googleadservices\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*amazon-adsystem\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*scorecardresearch\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*adnxs\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*criteo\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*taboola\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*outbrain\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*adsrvr\\.org.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*quantserve\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*rubiconproject\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*pubmatic\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*openx\\.net.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*moatads\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*demdex\\.net.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*everesttech\\.net.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*moat\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*ads-twitter\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*soundcloud\\.com.*upsell.*",
+      "resource-type": [
+        "script",
+        "media",
+        "raw",
+        "image"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*soundcloud\\.com.*promotion.*",
+      "resource-type": [
+        "script",
+        "media",
+        "raw",
+        "image"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*soundcloud\\.com.*advert.*",
+      "resource-type": [
+        "script",
+        "media",
+        "raw",
+        "image"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*soundcloud\\.com.*premium-nudge.*",
+      "resource-type": [
+        "script",
+        "media",
+        "raw",
+        "image"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*sndcdn\\.com.*advert.*",
+      "resource-type": [
+        "script",
+        "media",
+        "raw",
+        "image"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  }
+]
