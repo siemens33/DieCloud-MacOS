@@ -40,8 +40,10 @@
       '[class*="advertisement" i]',
       '[class*="sponsored" i]',
       '[class*="promotedTrack" i]',
+      '[class*="promoted" i]',
       '[data-testid*="advert" i]',
       '[data-testid*="sponsor" i]',
+      '[data-testid*="promot" i]',
       '[aria-label*="advertisement" i]',
       '[aria-label*="реклама" i]',
       'iframe[src*="doubleclick"]',
@@ -119,21 +121,22 @@
         color: var(--dc-muted) !important;
       }
 
-      /* Matte player: полупрозрачность держится и при hover/focus —
-         SoundCloud перекрашивает плеер по :hover и перерендеривает узлы,
-         поэтому те же правила дублируются для :hover/:focus-within/:active,
-         для родительской планки и напрямую для нативных классов
-         (на случай если data-атрибут ещё не проставлен после перерендера). */
+      /* Matte player: видимое матовое стекло даже на чёрном фоне —
+         свой sheen-градиент + blur. Селекторы с запасом: data-атрибуты,
+         нативный footer, подстрока playControls и testid — классы SoundCloud
+         меняются, а панель должна краситься всегда. Покой и hover/focus
+         идентичны, чтобы эффект не слетал при наведении. */
       html.dc-modern [data-dc-player],
       html.dc-modern [data-dc-playerbar],
-      html.dc-modern .playControls,
+      html.dc-modern footer,
+      html.dc-modern [class*="playControls" i],
       html.dc-modern [data-testid="play-controls"] {
-        background-color: rgba(15,16,21,.68) !important;
-        background-image: none !important;
-        -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
-        backdrop-filter: blur(20px) saturate(150%) !important;
-        border-top: 1px solid rgba(255,255,255,.12) !important;
-        box-shadow: 0 -8px 28px rgba(0,0,0,.25) !important;
+        background-color: rgba(28,29,37,.88) !important;
+        background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 42%) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+        backdrop-filter: blur(24px) saturate(160%) !important;
+        border-top: 1px solid rgba(255,255,255,.14) !important;
+        box-shadow: 0 -10px 34px rgba(0,0,0,.35) !important;
         isolation: isolate !important;
         transition-property: opacity, border-color, box-shadow !important;
       }
@@ -143,27 +146,36 @@
       html.dc-modern [data-dc-playerbar]:hover,
       html.dc-modern [data-dc-playerbar]:focus-within,
       html.dc-modern [data-dc-playerbar]:active,
-      html.dc-modern .playControls:hover,
-      html.dc-modern .playControls:focus-within,
-      html.dc-modern .playControls:active,
+      html.dc-modern footer:hover,
+      html.dc-modern footer:focus-within,
+      html.dc-modern footer:active,
+      html.dc-modern [class*="playControls" i]:hover,
+      html.dc-modern [class*="playControls" i]:focus-within,
+      html.dc-modern [class*="playControls" i]:active,
       html.dc-modern [data-testid="play-controls"]:hover,
       html.dc-modern [data-testid="play-controls"]:focus-within,
       html.dc-modern [data-testid="play-controls"]:active {
-        background-color: rgba(15,16,21,.68) !important;
-        background-image: none !important;
-        -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
-        backdrop-filter: blur(20px) saturate(150%) !important;
-        border-top: 1px solid rgba(255,255,255,.12) !important;
-        box-shadow: 0 -8px 28px rgba(0,0,0,.25) !important;
+        background-color: rgba(28,29,37,.88) !important;
+        background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 42%) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+        backdrop-filter: blur(24px) saturate(160%) !important;
+        border-top: 1px solid rgba(255,255,255,.14) !important;
+        box-shadow: 0 -10px 34px rgba(0,0,0,.35) !important;
       }
+      /* Внутренности планки — прозрачные, чтобы не перекрывать стекло.
+         Обложки с background-image не трогаем — их красит dc-rounded. */
       html.dc-modern [data-dc-player] > *,
       html.dc-modern [data-dc-playerbar] > *,
+      html.dc-modern footer > *,
       html.dc-modern [data-dc-player] [class*="playControls__"],
       html.dc-modern [data-dc-playerbar] [class*="playControls__"],
       html.dc-modern [data-dc-player] [class*="playbackSoundBadge"],
       html.dc-modern [data-dc-playerbar] [class*="playbackSoundBadge"],
+      html.dc-modern footer div:not([style*="background-image"]),
+      html.dc-modern footer section:not([style*="background-image"]),
       html.dc-modern [data-dc-player]:hover > *,
       html.dc-modern [data-dc-playerbar]:hover > *,
+      html.dc-modern footer:hover > *,
       html.dc-modern [data-dc-player]:hover [class*="playControls__"],
       html.dc-modern [data-dc-playerbar]:hover [class*="playControls__"],
       html.dc-modern [data-dc-player]:hover [class*="playbackSoundBadge"],
@@ -173,15 +185,22 @@
       }
       html.dc-modern [data-dc-player] button,
       html.dc-modern [data-dc-player] a,
-      html.dc-modern [data-dc-player] [role="button"] {
+      html.dc-modern [data-dc-player] [role="button"],
+      html.dc-modern footer button,
+      html.dc-modern footer a,
+      html.dc-modern footer [role="button"] {
         background-color: transparent !important;
+        background-image: none !important;
         box-shadow: none !important;
         border-color: transparent !important;
         transition: opacity var(--dc-fast) !important;
       }
       html.dc-modern [data-dc-player] button:hover,
       html.dc-modern [data-dc-player] a:hover,
-      html.dc-modern [data-dc-player] [role="button"]:hover {
+      html.dc-modern [data-dc-player] [role="button"]:hover,
+      html.dc-modern footer button:hover,
+      html.dc-modern footer a:hover,
+      html.dc-modern footer [role="button"]:hover {
         opacity: .88 !important;
       }
 
@@ -360,6 +379,24 @@
     } catch (_) {}
   }
 
+  // Промо-треки в лентах: бейдж "Promoted"/"Sponsored" переживает
+  // переименования классов — ищем по тексту коротких элементов.
+  function removePromotedCards(scope = document) {
+    if (!state.settings.adBlock) return;
+    try {
+      const badges = scope instanceof Element && scope.matches('span, em, strong, small')
+        ? [scope]
+        : Array.from(scope.querySelectorAll?.('span, em, strong, small') ?? []);
+      for (const b of badges) {
+        const t = (b.textContent || '').trim().toLowerCase();
+        if (t !== 'promoted' && t !== 'sponsored' && t !== 'advertisement' && t !== 'реклама') continue;
+        const card = b.closest?.('.trackItem, .soundBadge, .sound, .soundList__item, li, [class*="card" i]');
+        if (card) card.remove();
+        else b.remove();
+      }
+    } catch (_) {}
+  }
+
   function skipAudioAds(scope = document) {
     if (!state.settings.adBlock) return;
     try {
@@ -368,7 +405,9 @@
         : Array.from(scope.querySelectorAll?.('audio') ?? []);
       for (const a of audios) {
         const src = (a.currentSrc || a.src || '').toLowerCase();
-        if (src.includes('advert') || src.includes('/ads/') || src.includes('promotion')) {
+        if (a.hasAttribute('data-ad') ||
+            src.includes('advert') || src.includes('/ads/') || src.includes('promotion') ||
+            src.includes('preroll') || src.includes('doubleclick') || src.includes('adsrv')) {
           try { a.muted = true; a.currentTime = (a.duration || 0); a.pause(); } catch (_) {}
           a.remove();
         }
@@ -387,9 +426,66 @@
     root.classList.toggle('dc-noads', Boolean(s.adBlock));
   }
 
+  // Структурный поиск планки плеера: классы SoundCloud периодически
+  // переименовываются, поэтому ищем через <audio> -> fixed/sticky предок
+  // у нижнего края вьюпорта. Быстрый путь — уже помеченный узел жив.
+  function ensurePlayerBar() {
+    try {
+      const marked = document.querySelector('[data-dc-playerbar]');
+      if (marked && marked.isConnected) return;
+      let el = document.querySelector(selectors.player);
+      if (!el) {
+        const audios = document.querySelectorAll('audio');
+        for (const a of audios) {
+          let p = a.parentElement;
+          for (let i = 0; i < 8 && p && p !== document.body; i++, p = p.parentElement) {
+            let r, cs;
+            try {
+              r = p.getBoundingClientRect();
+              cs = getComputedStyle(p);
+            } catch (_) { continue; }
+            if ((cs.position === 'fixed' || cs.position === 'sticky') &&
+                r.bottom >= window.innerHeight - 8 && r.width > window.innerWidth * 0.5) {
+              el = p;
+              break;
+            }
+          }
+          if (el) break;
+        }
+      }
+      if (!el) {
+        // SoundCloud может играть без <audio> в DOM: ищем кнопку play/pause
+        // и поднимаемся к широкой планке у нижнего края.
+        const btns = document.querySelectorAll('button[aria-label], [role="button"][aria-label]');
+        for (const b of btns) {
+          const label = (b.getAttribute('aria-label') || '').toLowerCase();
+          if (!/play|pause|воспроиз|пауз/.test(label)) continue;
+          let p = b.parentElement;
+          for (let i = 0; i < 10 && p && p !== document.body; i++, p = p.parentElement) {
+            let r;
+            try { r = p.getBoundingClientRect(); } catch (_) { continue; }
+            if (r.bottom >= window.innerHeight - 8 && r.width > window.innerWidth * 0.5 &&
+                r.height < window.innerHeight * 0.4) {
+              el = p;
+              break;
+            }
+          }
+          if (el) break;
+        }
+      }
+      if (el) {
+        el.setAttribute('data-dc-player', '');
+        const bar = (el.closest && el.closest(selectors.playerBar)) || el;
+        bar.setAttribute('data-dc-playerbar', '');
+      }
+    } catch (_) {}
+  }
+
   function refresh(scope = document) {
+    if (scope === document) ensurePlayerBar();
     tag(scope);
     removeAds(scope);
+    removePromotedCards(scope);
     skipAudioAds(scope);
     applyClasses();
   }
@@ -404,10 +500,12 @@
           if (n instanceof Element) {
             tag(n);
             removeAds(n);
+            removePromotedCards(n);
             skipAudioAds(n);
           }
         }
       } catch (_) {}
+      ensurePlayerBar();
       applyClasses();
     }, 180);
   }

@@ -5,7 +5,7 @@ import Network
 
 enum AppConfig {
     static let name = "DieCloude"
-    static let version = "4.0.0"
+    static let version = "4.0.1"
     static let build = "32"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
@@ -38,6 +38,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private var adBlockRuleList: WKContentRuleList?
     private var vpnController: VPNWindowController?
     private let updateManager = UpdateManager()
+    // Автосейв: если движок темы ещё не готов (страница грузится),
+    // визуальное применение откладывается до didFinish.
+    private var needsSettingsSync = false
 
     private var adBlockEnabled = true
     private var focusEnabled = false
@@ -240,42 +243,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.translatesAutoresizingMaskIntoConstraints = false
         let name = NSTextField(labelWithString: AppConfig.name)
-        name.font = .systemFont(ofSize: 28, weight: .bold)
-        let subtitle = NSTextField(labelWithString: "Настройте внешний вид и поведение SoundCloud")
+        name.font = .systemFont(ofSize: 26, weight: .bold)
+        let subtitle = NSTextField(labelWithString: "Настройки · ⌘, — применяются сразу")
         subtitle.textColor = .secondaryLabelColor
+        subtitle.font = .systemFont(ofSize: 12)
+        let headerText = NSStackView(views: [name, subtitle])
+        headerText.orientation = .vertical
+        headerText.alignment = .leading
+        headerText.spacing = 2
+        let header = NSStackView(views: [icon, headerText])
+        header.orientation = .horizontal
+        header.alignment = .centerY
+        header.spacing = 12
 
-        let designTitle = sectionLabel("Дизайн")
         modernDesignSwitch = checkbox("Минималистичный интерфейс DieCloude", state: modernDesignEnabled, action: #selector(toggleModernDesign(_:)))
         roundedCardsSwitch = checkbox("Аккуратное скругление обложек", state: roundedCardsEnabled, action: #selector(toggleRoundedCards(_:)))
         roundedCardsSwitch.toolTip = "Скругляет только обложки треков, альбомов и плейлистов"
         artworkHoverSwitch = checkbox("Мягкий эффект при наведении", state: artworkHoverEnabled, action: #selector(toggleArtworkHover(_:)))
-        artworkHoverSwitch.toolTip = "Слегка увеличивает и подсвечивает только обложку, не двигая карточку"
+        artworkHoverSwitch.toolTip = "Слегка подсвечивает только обложку, не двигая карточку"
         compactModeSwitch = checkbox("Компактная плотность интерфейса", state: compactModeEnabled, action: #selector(toggleCompactMode(_:)))
         compactModeSwitch.toolTip = "Уменьшает лишние вертикальные отступы без перестройки сетки SoundCloud"
         themeSwitch = checkbox("Белый фирменный акцент", state: themeEnabled, action: #selector(toggleTheme(_:)))
+        let reset = NSButton(title: "Сбросить оформление", target: self, action: #selector(resetDesignSettings(_:)))
+        reset.bezelStyle = .rounded
+        let designBox = groupBox(title: "Внешний вид", views: [modernDesignSwitch, themeSwitch, roundedCardsSwitch, artworkHoverSwitch, compactModeSwitch, reset])
 
-        let listeningTitle = sectionLabel("Прослушивание")
         focusSwitch = checkbox("Режим фокуса — скрыть рекомендации", state: focusEnabled, action: #selector(toggleFocus(_:)))
+        focusSwitch.toolTip = "Убирает сайдбар, комментарии и промо"
         adBlockSwitch = checkbox("Режим без рекламы", state: adBlockEnabled, action: #selector(toggleAdBlock(_:)))
-        adBlockSwitch.toolTip = "Блокирует известные рекламные запросы и скрывает рекламные блоки"
+        adBlockSwitch.toolTip = "Блокирует рекламные запросы, промо-треки и аудиопрероллы"
+        let listeningBox = groupBox(title: "Прослушивание", views: [focusSwitch, adBlockSwitch])
 
-        let version = NSTextField(labelWithString: "Версия \(AppConfig.version)")
+        let version = NSTextField(labelWithString: "Версия \(AppConfig.version) (\(AppConfig.build))")
         version.textColor = .secondaryLabelColor
+        version.font = .systemFont(ofSize: 12)
         let author = NSTextField(labelWithString: AppConfig.author)
         author.textColor = .tertiaryLabelColor
-        let s1 = NSBox(); s1.boxType = .separator
-        let s2 = NSBox(); s2.boxType = .separator
-        let s3 = NSBox(); s3.boxType = .separator
+        author.font = .systemFont(ofSize: 12)
+        let updateButton = NSButton(title: "Проверить обновления…", target: self, action: #selector(checkForUpdates(_:)))
+        updateButton.bezelStyle = .rounded
+        let aboutBox = groupBox(title: "О программе", views: [version, author, updateButton])
         let close = symbolButton("xmark", action: #selector(toggleInfoPanel(_:)), tooltip: "Закрыть")
 
-        let reset = NSButton(title: "Восстановить стандартный дизайн", target: self, action: #selector(resetDesignSettings(_:)))
-        reset.bezelStyle = .rounded
-        let stack = NSStackView(views: [icon, name, subtitle, s1, designTitle, modernDesignSwitch, themeSwitch, roundedCardsSwitch, artworkHoverSwitch, compactModeSwitch, reset, s3, listeningTitle, focusSwitch, adBlockSwitch, version, author])
+        let stack = NSStackView(views: [header, designBox, listeningBox, aboutBox])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 10
-        stack.edgeInsets = NSEdgeInsets(top: 24, left: 24, bottom: 24, right: 24)
+        stack.spacing = 14
+        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
+        for fullWidth in [header, designBox, listeningBox, aboutBox] as [NSView] {
+            fullWidth.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
+        }
 
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
@@ -306,10 +324,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         ])
     }
 
-    private func sectionLabel(_ title: String) -> NSTextField {
-        let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: 16, weight: .semibold)
-        return label
+    private func groupBox(title: String, views: [NSView]) -> NSBox {
+        let box = NSBox()
+        box.title = title
+        box.boxType = .primary
+        box.translatesAutoresizingMaskIntoConstraints = false
+        let inner = NSStackView(views: views)
+        inner.orientation = .vertical
+        inner.alignment = .leading
+        inner.spacing = 8
+        inner.translatesAutoresizingMaskIntoConstraints = false
+        guard let content = box.contentView else { return box }
+        content.addSubview(inner)
+        NSLayoutConstraint.activate([
+            inner.topAnchor.constraint(equalTo: content.topAnchor, constant: 10),
+            inner.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
+            inner.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
+            inner.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12)
+        ])
+        return box
     }
 
     private func symbolButton(_ symbol: String, action: Selector, tooltip: String) -> NSButton {
@@ -359,12 +392,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         }
     }
 
+    private func currentSettingsDict() -> [String: Bool] {
+        ["adBlock": adBlockEnabled, "focus": focusEnabled, "theme": themeEnabled,
+         "modernDesign": modernDesignEnabled, "roundedCards": roundedCardsEnabled,
+         "artworkHover": artworkHoverEnabled, "compactMode": compactModeEnabled]
+    }
+
+    private func pushAllSettings() {
+        guard let data = try? JSONSerialization.data(withJSONObject: currentSettingsDict()),
+              let json = String(data: data, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("window.__diecloude?.setAll(\(json))") { [weak self] result, _ in
+            // Движка нет (страница ещё грузится) — повторим в didFinish.
+            if result == nil { self?.needsSettingsSync = true }
+        }
+    }
+
     private func applySetting(_ name: String, value: Bool, reload: Bool = false) {
         // Безопасная передача без строковой интерполяции
         let payload = (try? JSONSerialization.data(withJSONObject: [name: value])) ?? Data()
         let json = String(data: payload, encoding: .utf8) ?? "{}"
-        webView.evaluateJavaScript("window.__diecloude?.setAll(\(json))")
-        if reload { webView.reload() }
+        if reload {
+            // Контекст страницы будет уничтожен — просто перезагружаем,
+            // didFinish сам вольёт все сохранённые настройки.
+            needsSettingsSync = true
+            webView.reload()
+            return
+        }
+        webView.evaluateJavaScript("window.__diecloude?.setAll(\(json))") { [weak self] result, _ in
+            guard let self else { return }
+            // Движка нет на странице (не успел вгрузиться или инъекция
+            // не сработала) — поднимаем его принудительно и втягиваем всё.
+            if result == nil {
+                self.needsSettingsSync = true
+                self.ensureThemeEngine { _ in self.pushAllSettings() }
+            }
+        }
+    }
+
+    /// Движок обязан существовать: если user-script не сработал,
+    /// впрыскиваем его напрямую evaluateJavaScript (перевпрыск безопасен).
+    private func ensureThemeEngine(completion: ((Bool) -> Void)? = nil) {
+        webView.evaluateJavaScript("typeof window.__diecloude") { [weak self] result, _ in
+            guard let self else { completion?(false); return }
+            if (result as? String) == "object" {
+                completion?(true)
+                return
+            }
+            let source = self.featureJavaScript()
+            self.webView.evaluateJavaScript(source) { _, _ in
+                self.webView.evaluateJavaScript("typeof window.__diecloude") { result2, _ in
+                    completion?((result2 as? String) == "object")
+                }
+            }
+        }
     }
 
     @objc private func toggleAdBlock(_ sender: NSButton) {
@@ -511,6 +591,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         }
     }
 
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Каждая загрузка втягивает сохранённые настройки в страницу.
+        // Сначала убеждаемся, что движок вообще есть (самопочинка),
+        // иначе тоглы молча ни на что не влияют.
+        needsSettingsSync = false
+        ensureThemeEngine { [weak self] _ in self?.pushAllSettings() }
+    }
+
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         let nsError = error as NSError
         if nsError.code != NSURLErrorCancelled { showError(nsError) }
@@ -526,8 +614,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     private func featureJavaScript() -> String {
-        let dict: [String: Bool] = ["adBlock": adBlockEnabled, "focus": focusEnabled, "theme": themeEnabled, "modernDesign": modernDesignEnabled, "roundedCards": roundedCardsEnabled, "artworkHover": artworkHoverEnabled, "compactMode": compactModeEnabled]
-        let data = (try? JSONSerialization.data(withJSONObject: dict)) ?? Data("{}\n".utf8)
+        // Тот же словарь, что и в pushAllSettings — единый источник автосейва.
+        let data = (try? JSONSerialization.data(withJSONObject: currentSettingsDict())) ?? Data("{}\n".utf8)
         let settings = String(data: data, encoding: .utf8) ?? "{}"
         guard let url = Bundle.main.url(forResource: "theme-engine", withExtension: "js"),
               let source = try? String(contentsOf: url, encoding: .utf8) else {
