@@ -209,10 +209,10 @@
       html.dc-modern [data-testid="play-controls"]:hover,
       html.dc-modern [data-testid="play-controls"]:focus-within,
       html.dc-modern [data-testid="play-controls"]:active {
-        background-color: rgba(15,16,20,.72) !important;
+        background-color: rgba(15,16,20,.88) !important;
         background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 46%) !important;
-        -webkit-backdrop-filter: blur(30px) saturate(150%) !important;
-        backdrop-filter: blur(30px) saturate(150%) !important;
+        -webkit-backdrop-filter: blur(40px) saturate(150%) !important;
+        backdrop-filter: blur(40px) saturate(150%) !important;
         border-top: 1px solid rgba(255,255,255,.18) !important;
         box-shadow: 0 -6px 24px rgba(0,0,0,.5) !important;
         isolation: isolate !important;
@@ -312,6 +312,22 @@
         background-color: var(--dc-accent) !important;
         border-color: var(--dc-accent) !important;
         box-shadow: none !important;
+      }
+
+      /* Мягкая тонировка родной кнопки плеера под цвет акцента:
+         цвет подмешивается в белый, круг остаётся спокойным.
+         При монохроме (белый акцент) это просто белый. */
+      html.dc-modern [class*="playControls__play"] {
+        background-color: color-mix(in srgb, var(--dc-accent) 26%, #ffffff) !important;
+        border: none !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,.28) !important;
+      }
+      html.dc-modern [class*="playControls__play"]:hover {
+        background-color: color-mix(in srgb, var(--dc-accent) 38%, #ffffff) !important;
+      }
+      /* Иконка внутри кнопки остаётся тёмной для контраста */
+      html.dc-modern [class*="playControls__play"] svg {
+        fill: color-mix(in srgb, var(--dc-accent) 18%, #111111) !important;
       }
 
       /* Акцентные кнопки — цвет текущей темы (монохром по умолчанию) */
