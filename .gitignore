@@ -7,3 +7,6 @@ build/
 MEMORY.md
 RELEASE_PROCESS.md
 ROADMAP.md
+
+# Сгенерируемый тестовый стенд (dev/player-mock.html + текущий движок)
+dev/player-test.html

@@ -5,8 +5,8 @@ import Network
 
 enum AppConfig {
     static let name = "DieCloude"
-    static let version = "4.0.2"
-    static let build = "33"
+    static let version = "4.1.0"
+    static let build = "34"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
@@ -21,6 +21,7 @@ private enum DefaultsKey {
     static let roundedCards = "DieCloudeRoundedCardsEnabled"
     static let artworkHover = "DieCloudeArtworkHoverEnabled"
     static let compactMode = "DieCloudeCompactModeEnabled"
+    static let accent = "DieCloudeAccentTheme"
     static let darkThemeFix = "DieCloudeVisualSystemV400Build31"
 
     /// «Что нового» показывается при каждом обновлении: ключ автоматически
@@ -46,6 +47,8 @@ private final class SettingsState {
     }
 
     private(set) var flags: [Flag]
+    /// Цветовой акцент: mono / amber / blue / system.
+    private(set) var accent: String
 
     init() {
         let initial: [(key: String, jsKey: String, title: String, tooltip: String, defaultValue: Bool)] = [
@@ -65,12 +68,17 @@ private final class SettingsState {
              "Блокирует рекламные запросы, промо-треки и аудиопрероллы", true)
         ]
         flags = initial.map { Flag(key: $0.key, jsKey: $0.jsKey, title: $0.title, tooltip: $0.tooltip, defaultValue: $0.defaultValue, value: $0.defaultValue) }
+        let savedAccent = UserDefaults.standard.string(forKey: DefaultsKey.accent)
+        accent = ["mono", "amber", "blue", "system"].contains(savedAccent ?? "") ? savedAccent! : "mono"
         load()
     }
 
-    /// Значения для инъекции в theme-engine.js.
+    /// Значения для инъекции в theme-engine.js. Для «системного» акцента
+    /// прикладываем точный hex из macOS — CSS не умеет читать акцент сам.
     var json: String {
-        let dict = Dictionary(uniqueKeysWithValues: flags.map { ($0.jsKey, $0.value) })
+        var dict: [String: Any] = Dictionary(uniqueKeysWithValues: flags.map { ($0.jsKey, $0.value) })
+        dict["accent"] = accent
+        if accent == "system" { dict["accentHex"] = NSColor.controlAccentColor.hexString }
         let data = (try? JSONSerialization.data(withJSONObject: dict)) ?? Data("{}".utf8)
         return String(data: data, encoding: .utf8) ?? "{}"
     }
@@ -101,6 +109,35 @@ private final class SettingsState {
             UserDefaults.standard.set(flags[index].defaultValue, forKey: flags[index].key)
             flags[index].button?.state = flags[index].defaultValue ? .on : .off
         }
+        setAccent("mono")
+        accentPopup?.selectItem(at: 0)
+    }
+
+    /// Выбор акцента из popup-кнопки (индексы совпадают с accentTitles).
+    private static let accentTitles = ["Монохром (белый)", "Янтарный", "Синий", "Как в системе"]
+    private static let accentValues = ["mono", "amber", "blue", "system"]
+    private(set) weak var accentPopup: NSPopUpButton?
+
+    func makeAccentPopup(action: Selector, target: AnyObject) -> NSPopUpButton {
+        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
+        popup.addItems(withTitles: Self.accentTitles)
+        popup.selectItem(at: Self.accentValues.firstIndex(of: accent) ?? 0)
+        popup.target = target
+        popup.action = action
+        popup.toolTip = "Цвет кнопок, шкалы времени и громкости"
+        accentPopup = popup
+        return popup
+    }
+
+    var accentPopupIndex: Int? {
+        guard let popup = accentPopup else { return nil }
+        let index = popup.indexOfSelectedItem
+        return Self.accentValues.indices.contains(index) ? index : nil
+    }
+
+    func setAccent(_ value: String) {
+        accent = Self.accentValues.contains(value) ? value : "mono"
+        UserDefaults.standard.set(accent, forKey: DefaultsKey.accent)
     }
 
     func makeCheckbox(for jsKey: String, action: Selector, target: AnyObject) -> NSButton? {
@@ -119,6 +156,15 @@ private final class SettingsState {
                 ? flags[index].defaultValue
                 : defaults.bool(forKey: flags[index].key)
         }
+    }
+}
+
+private extension NSColor {
+    /// Hex системного акцента macOS для передачи в CSS.
+    var hexString: String {
+        guard let c = usingColorSpace(.deviceRGB) else { return "#ffffff" }
+        let r = Int(round(c.redComponent * 255)), g = Int(round(c.greenComponent * 255)), b = Int(round(c.blueComponent * 255))
+        return String(format: "#%02x%02x%02x", r, g, b)
     }
 }
 
@@ -192,10 +238,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private var vpnController: VPNWindowController?
     private let updateManager = UpdateManager()
     private let settings = SettingsState()
+    private let nowPlaying = NowPlayingController()
     // Автосейв: если движок темы ещё не готов (страница грузится),
     // визуальное применение откладывается до didFinish.
     private var needsSettingsSync = false
     private var panelVisible = false
+    // Статус движка и служебные оверлеи
+    private var engineStatusLabel: NSTextField!
+    private var statusBanner: NSVisualEffectView!
+    private var statusBannerLabel: NSTextField!
+    private var errorOverlay: NSVisualEffectView!
+    private var errorDetail: NSTextField!
+    private var playerMissingAnnounced = false
 
     // MARK: - Жизненный цикл
 
@@ -203,11 +257,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         migrateLegacyDefaultsIfNeeded()
         buildMenu()
         buildWindow()
+        wireNowPlaying()
         compileAdBlockRules()
         loadHome(nil)
         NSApp.activate(ignoringOtherApps: true)
         showWelcomeIfNeeded()
         configureBackgroundServices()
+    }
+
+    /// Мост: системные медиа-команды → клики по кнопкам SoundCloud,
+    /// состояние плеера → MPNowPlayingInfoCenter, диагностика → панель.
+    private func wireNowPlaying() {
+        nowPlaying.performAction = { [weak self] action in
+            guard let self else { return }
+            switch action {
+            case .togglePlay: self.runPlayerScript(PlayerScripts.togglePlay)
+            case .next: self.runPlayerScript(PlayerScripts.nextTrack)
+            case .previous: self.runPlayerScript(PlayerScripts.previousTrack)
+            }
+        }
+        nowPlaying.performSeek = { [weak self] position in
+            self?.webView.evaluateJavaScript("window.__diecloude?.seek(\(position))", completionHandler: nil)
+        }
+        nowPlaying.onPlayerMissing = { [weak self] in self?.setEngineStatus(found: false) }
+        nowPlaying.onPlayerFound = { [weak self] in self?.setEngineStatus(found: true) }
+        nowPlaying.enableRemoteCommands()
     }
 
     /// Одноразовая миграция 4.0 (macOS 14+, Cmd+, вместо F1, noAds V8+).
@@ -352,6 +426,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         configuration.userContentController.addUserScript(
             WKUserScript(source: featureJavaScript(), injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
+        // Мост страница → приложение: состояние плеера, диагностика движка
+        nowPlaying.register(on: configuration.userContentController)
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
@@ -359,6 +435,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         webView.allowsBackForwardNavigationGestures = true
         webView.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(webView)
+        buildStatusBanner(in: root)
+        buildErrorOverlay(in: root)
         buildSidePanel(in: root)
         observeWebView()
 
@@ -415,10 +493,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         icon.translatesAutoresizingMaskIntoConstraints = false
         let name = NSTextField(labelWithString: AppConfig.name)
         name.font = .systemFont(ofSize: 26, weight: .bold)
-        let subtitle = NSTextField(labelWithString: "Настройки · ⌘, — применяются сразу")
-        subtitle.textColor = .secondaryLabelColor
-        subtitle.font = .systemFont(ofSize: 12)
-        let headerText = NSStackView(views: [name, subtitle])
+        engineStatusLabel = NSTextField(labelWithString: "Настройки · ⌘, — применяются сразу")
+        engineStatusLabel.textColor = .secondaryLabelColor
+        engineStatusLabel.font = .systemFont(ofSize: 12)
+        let headerText = NSStackView(views: [name, engineStatusLabel])
         headerText.orientation = .vertical
         headerText.alignment = .leading
         headerText.spacing = 2
@@ -435,10 +513,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             settings.makeCheckbox(for: "artworkHover", action: toggleAction, target: self),
             settings.makeCheckbox(for: "compactMode", action: toggleAction, target: self)
         ].compactMap { $0 }
+        // Выбор цветового акцента: строки popup совпадают по индексам с accentValues
+        let accentPopup = settings.makeAccentPopup(action: #selector(changeAccent(_:)), target: self)
+        accentPopup.widthAnchor.constraint(equalToConstant: 190).isActive = true
+        let accentLabel = NSTextField(labelWithString: "Цветовой акцент")
+        let accentRow = NSStackView(views: [accentLabel, accentPopup])
+        accentRow.orientation = .horizontal
+        accentRow.spacing = 10
+        accentRow.alignment = .centerY
         let reset = NSButton(title: "Сбросить оформление", target: self, action: #selector(resetDesignSettings(_:)))
         reset.bezelStyle = .rounded
         reset.controlSize = .regular
-        let designBox = groupBox(title: "Внешний вид", views: designViews + [reset])
+        let designBox = groupBox(title: "Внешний вид", views: designViews + [accentRow, reset])
 
         let listeningViews: [NSView] = [
             settings.makeCheckbox(for: "focus", action: toggleAction, target: self),
@@ -658,6 +744,176 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         }
     }
 
+    // MARK: - Цветовой акцент
+
+    @objc private func changeAccent(_ sender: NSPopUpButton) {
+        let values = ["mono", "amber", "blue", "system"]
+        let index = sender.indexOfSelectedItem
+        guard values.indices.contains(index) else { return }
+        settings.setAccent(values[index])
+        pushAllSettings()
+    }
+
+    // MARK: - Диагностика движка темы
+
+    private func setEngineStatus(found: Bool) {
+        guard let label = engineStatusLabel else { return }
+        if found {
+            label.stringValue = "Настройки · ⌘, — применяются сразу"
+            if !statusBanner.isHidden { hideStatusBanner(nil) }
+        } else {
+            label.stringValue = "Панель плеера не найдена — SoundCloud изменил разметку"
+            if !playerMissingAnnounced {
+                playerMissingAnnounced = true
+                showStatusBanner("DieCloude не нашёл панель плеера: SoundCloud изменил разметку. Оформление может применяться не полностью.")
+            }
+        }
+    }
+
+    // MARK: - Баннер поверх контента (тихое уведомление)
+
+    private func buildStatusBanner(in root: NSView) {
+        statusBanner = NSVisualEffectView()
+        statusBanner.material = .hudWindow
+        statusBanner.appearance = NSAppearance(named: .darkAqua)
+        statusBanner.blendingMode = .withinWindow
+        statusBanner.state = .active
+        statusBanner.wantsLayer = true
+        statusBanner.layer?.cornerRadius = 12
+        statusBanner.layer?.masksToBounds = true
+        statusBanner.layer?.borderWidth = 1
+        statusBanner.layer?.borderColor = NSColor.separatorColor.cgColor
+        statusBanner.translatesAutoresizingMaskIntoConstraints = false
+        statusBanner.isHidden = true
+
+        statusBannerLabel = NSTextField(labelWithString: "")
+        statusBannerLabel.font = .systemFont(ofSize: 12)
+        statusBannerLabel.textColor = .labelColor
+        statusBannerLabel.lineBreakMode = .byTruncatingTail
+        statusBannerLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let ok = NSButton(title: "Понятно", target: self, action: #selector(hideStatusBanner))
+        ok.bezelStyle = .rounded
+        ok.controlSize = .small
+
+        statusBanner.addSubview(statusBannerLabel)
+        statusBanner.addSubview(ok)
+        root.addSubview(statusBanner)
+        NSLayoutConstraint.activate([
+            statusBanner.topAnchor.constraint(equalTo: root.topAnchor, constant: 88),
+            statusBanner.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 18),
+            statusBanner.widthAnchor.constraint(lessThanOrEqualToConstant: 620),
+            statusBanner.heightAnchor.constraint(equalToConstant: 38),
+            statusBannerLabel.leadingAnchor.constraint(equalTo: statusBanner.leadingAnchor, constant: 14),
+            statusBannerLabel.centerYAnchor.constraint(equalTo: statusBanner.centerYAnchor),
+            statusBannerLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 470),
+            ok.leadingAnchor.constraint(equalTo: statusBannerLabel.trailingAnchor, constant: 12),
+            ok.trailingAnchor.constraint(equalTo: statusBanner.trailingAnchor, constant: -10),
+            ok.centerYAnchor.constraint(equalTo: statusBanner.centerYAnchor)
+        ])
+    }
+
+    private func showStatusBanner(_ text: String) {
+        statusBannerLabel.stringValue = text
+        statusBanner.isHidden = false
+        statusBanner.alphaValue = 0
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            statusBanner.animator().alphaValue = 1
+        }
+    }
+
+    @objc private func hideStatusBanner(_ sender: Any?) {
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.2
+            statusBanner.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            self?.statusBanner.isHidden = true
+        })
+    }
+
+    // MARK: - Встроенная страница ошибки (вместо модального алерта)
+
+    private func buildErrorOverlay(in root: NSView) {
+        errorOverlay = NSVisualEffectView()
+        errorOverlay.material = .underWindowBackground
+        errorOverlay.blendingMode = .behindWindow
+        errorOverlay.state = .active
+        errorOverlay.translatesAutoresizingMaskIntoConstraints = false
+        errorOverlay.isHidden = true
+
+        let icon = NSImageView()
+        icon.image = NSImage(systemSymbolName: "wifi.exclamationmark", accessibilityDescription: "Нет соединения")
+        icon.contentTintColor = .secondaryLabelColor
+        icon.translatesAutoresizingMaskIntoConstraints = false
+
+        let title = NSTextField(labelWithString: "Нет соединения с SoundCloud")
+        title.font = .systemFont(ofSize: 18, weight: .semibold)
+        errorDetail = NSTextField(wrappingLabelWithString: "")
+        errorDetail.textColor = .secondaryLabelColor
+        errorDetail.font = .systemFont(ofSize: 13)
+        errorDetail.alignment = .center
+
+        let retry = NSButton(title: "Повторить", target: self, action: #selector(retryConnection))
+        retry.bezelStyle = .rounded
+        retry.keyEquivalent = "\r"
+        let dismiss = NSButton(title: "Скрыть", target: self, action: #selector(dismissConnectionError(_:)))
+        dismiss.bezelStyle = .rounded
+        let buttons = NSStackView(views: [retry, dismiss])
+        buttons.orientation = .horizontal
+        buttons.spacing = 10
+
+        let stack = NSStackView(views: [icon, title, errorDetail, buttons])
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        errorOverlay.addSubview(stack)
+        root.addSubview(errorOverlay, positioned: .above, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            errorOverlay.topAnchor.constraint(equalTo: webView.topAnchor),
+            errorOverlay.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            errorOverlay.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            errorOverlay.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            stack.centerXAnchor.constraint(equalTo: errorOverlay.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: errorOverlay.centerYAnchor),
+            stack.widthAnchor.constraint(lessThanOrEqualToConstant: 460),
+            icon.widthAnchor.constraint(equalToConstant: 44),
+            icon.heightAnchor.constraint(equalToConstant: 44),
+            errorDetail.widthAnchor.constraint(lessThanOrEqualToConstant: 420)
+        ])
+    }
+
+    private func showConnectionError(_ error: NSError) {
+        errorDetail.stringValue = error.localizedDescription
+        errorOverlay.isHidden = false
+        errorOverlay.alphaValue = 0
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            errorOverlay.animator().alphaValue = 1
+        }
+    }
+
+    private func hideConnectionError() {
+        guard !errorOverlay.isHidden else { return }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.2
+            errorOverlay.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            self?.errorOverlay.isHidden = true
+        })
+    }
+
+    @objc private func retryConnection(_ sender: Any?) {
+        hideConnectionError()
+        loadHome(nil)
+    }
+
+    @objc private func dismissConnectionError(_ sender: Any?) {
+        hideConnectionError()
+    }
+
     // MARK: - Управление плеером (⌘P / ⌘← / ⌘→)
 
     @objc private func playerTogglePlay(_ sender: Any?) { runPlayerScript(PlayerScripts.togglePlay) }
@@ -782,18 +1038,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         ensureThemeEngine { [weak self] _ in self?.pushAllSettings() }
     }
 
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        let nsError = error as NSError
-        if nsError.code != NSURLErrorCancelled { showError(nsError) }
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // Страница начала грузиться — ошибка соединения больше не актуальна.
+        hideConnectionError()
     }
 
-    private func showError(_ error: NSError) {
-        let alert = NSAlert()
-        alert.messageText = "Не удалось открыть SoundCloud"
-        alert.informativeText = error.localizedDescription
-        alert.addButton(withTitle: "Повторить")
-        alert.addButton(withTitle: "Закрыть")
-        if alert.runModal() == .alertFirstButtonReturn { loadHome(nil) }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        let nsError = error as NSError
+        if nsError.code != NSURLErrorCancelled { showConnectionError(nsError) }
     }
 
     deinit {

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>DieCloude player mock</title>
+<style>
+  /* Мок нижней панели SoundCloud для визуальной проверки матового стекла.
+     Структура повторяет реальную: footer > .playControls > внутренности. */
+  html, body { margin: 0; height: 100%; background: #090a0d; color: #f5f5f7; font: 13px -apple-system; }
+  .page { padding: 24px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 28px 20px; }
+  .card .art {
+    width: 100%; aspect-ratio: 1; border-radius: 11px;
+    background: linear-gradient(135deg, #4b2a6b 0%, #1c2f5e 55%, #0d3b3b 100%);
+  }
+  .card:nth-child(2n) .art { background: linear-gradient(135deg, #6b2a2a 0%, #5e4a1c 60%, #2a2a2a 100%); }
+  .card:nth-child(3n) .art { background: linear-gradient(135deg, #1c5e46 0%, #2a1c5e 60%, #444 100%); }
+  .card .t { margin-top: 8px; font-weight: 600; }
+  .card .a { color: #9b9da5; }
+  /* Разноцветные элементы под стеклом — чтобы было видно blur */
+  .stripe { position: absolute; left: 0; right: 0; bottom: 0; height: 170px;
+    background: linear-gradient(90deg, #e0562f, #d9a12b, #3f9c6d, #3366cc, #8d4bcc); opacity: .85; }
+
+  footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; }
+  .playControls { display: flex; align-items: center; gap: 18px; padding: 12px 18px; }
+  .playControls__buttons { display: flex; gap: 14px; align-items: center; }
+  .playControls__play {
+    width: 40px; height: 40px; border-radius: 50%; background: #ff5500 !important;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 17px;
+  }
+  .ctl { font-size: 16px; opacity: .9; }
+  .playbackTimeline { flex: 1; display: flex; align-items: center; gap: 10px; }
+  .playbackTimeline__progressBackground { position: relative; flex: 1; height: 4px; background: rgba(255,255,255,.16); border-radius: 999px; }
+  .playbackTimeline__progressBar { position: absolute; left: 0; top: 0; bottom: 0; width: 40%; background: #ff5500; border-radius: 999px; }
+  .playbackSoundBadge { display: flex; align-items: center; gap: 10px; width: 260px; }
+  .playbackSoundBadge__avatar { position: relative; width: 40px; height: 40px; border-radius: 8px; overflow: hidden; }
+  .playbackSoundBadge__avatar .image__full {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    background: linear-gradient(135deg, #e0562f, #8d4bcc);
+  }
+  .playbackSoundBadge__title { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .playbackSoundBadge__artist { color: #9b9da5; font-size: 11px; }
+  .volume { width: 90px; height: 4px; background: rgba(255,255,255,.16); border-radius: 999px; position: relative; }
+  .volume__sliderProgress { position: absolute; left: 0; top: 0; bottom: 0; width: 70%; background: #ff5500; border-radius: 999px; }
+  .time { font-size: 12px; color: #cfcfd4; }
+</style>
+</head>
+<body>
+  <div class="stripe"></div>
+  <div class="page">
+    <div class="card"><div class="art"></div><div class="t">Трек один</div><div class="a">Исполнитель</div></div>
+    <div class="card"><div class="art"></div><div class="t">Ещё один длинный трек</div><div class="a">Группа</div></div>
+    <div class="card"><div class="art"></div><div class="t">Название</div><div class="a">Кто-то</div></div>
+    <div class="card"><div class="art"></div><div class="t">Песня про всё</div><div class="a">Артист</div></div>
+    <div class="card"><div class="art"></div><div class="t">Музыка</div><div class="a">Диджей</div></div>
+    <div class="card"><div class="art"></div><div class="t">Финальный</div><div class="a">Состав</div></div>
+  </div>
+
+  <footer>
+    <div class="playControls">
+      <div class="playControls__buttons">
+        <span class="ctl">⏮</span>
+        <div class="playControls__play">⏸</div>
+        <span class="ctl">⏭</span>
+        <span class="ctl">🔀</span>
+        <span class="ctl">🔁</span>
+      </div>
+      <span class="time">0:57</span>
+      <div class="playbackTimeline">
+        <div class="playbackTimeline__progressBackground"><div class="playbackTimeline__progressBar"></div></div>
+      </div>
+      <span class="time">1:40</span>
+      <div class="volume"><div class="volume__sliderProgress"></div></div>
+      <div class="playbackSoundBadge">
+        <div class="playbackSoundBadge__avatar"><div class="image__full"></div></div>
+        <div>
+          <div class="playbackSoundBadge__title">Туши бычок потом сходи с ума</div>
+          <div class="playbackSoundBadge__artist">тёмный принц</div>
+        </div>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
