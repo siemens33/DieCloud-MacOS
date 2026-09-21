@@ -217,8 +217,9 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
     private let keyField = NSSecureTextField()
     private let table = NSTableView()
     private let status = NSTextField(labelWithString: "VPN выключен")
+    private let statusDot = NSView()
     private let connectButton = NSButton(title: "Подключить", target: nil, action: nil)
-    private let autoConnectButton = NSButton(checkboxWithTitle: "Автоподключение при запуске DieCloude", target: nil, action: nil)
+    private let autoConnectSwitch = NSSwitch()
     private enum VPNDefaults {
         static let autoConnect = "DieCloudeVPNAutoConnect"
         static let servers = "DieCloudeVPNServers"
@@ -238,32 +239,141 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
     required init?(coder: NSCoder) { fatalError() }
 
     private func buildUI() {
-        guard let content = window?.contentView else { return }
-        let label = NSTextField(labelWithString: "Ключ или ссылка подписки Happ")
-        keyField.placeholderString = "Вставь subscription URL или ключ"; keyField.stringValue = KeychainStore.load(account: "happ-subscription") ?? ""
+        // Frosty-фон в тон приложению
+        let content = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 680, height: 480))
+        content.material = .underWindowBackground
+        content.blendingMode = .behindWindow
+        content.state = .active
+        window?.contentView = content
+
+        let label = sectionHeader("ПОДПИСКА")
+        keyField.placeholderString = "Вставь subscription URL или ключ"
+        keyField.stringValue = KeychainStore.load(account: "happ-subscription") ?? ""
         // Enter в поле ключа = «Обновить ключ»
         keyField.target = self; keyField.action = #selector(refreshKey)
+
         let refresh = NSButton(title: "Обновить ключ", target: self, action: #selector(refreshKey))
+        refresh.bezelStyle = .inline
+        refresh.controlSize = .small
+        refresh.contentTintColor = .secondaryLabelColor
         let ping = NSButton(title: "Проверить пинг", target: self, action: #selector(pingAll))
+        ping.bezelStyle = .inline
+        ping.controlSize = .small
+        ping.contentTintColor = .secondaryLabelColor
+        let keyButtons = NSStackView(views: [refresh, ping])
+        keyButtons.orientation = .horizontal
+        keyButtons.spacing = 14
+
+        let autoRow = settingsRow(title: "Автоподключение при запуске",
+                                  subtitle: "Вернётся к выбранному серверу автоматически",
+                                  control: autoConnectSwitch)
+        autoConnectSwitch.controlSize = .small
+        autoConnectSwitch.target = self; autoConnectSwitch.action = #selector(autoConnectChanged(_:))
+        autoConnectSwitch.state = UserDefaults.standard.bool(forKey: VPNDefaults.autoConnect) ? .on : .off
+
         connectButton.target = self; connectButton.action = #selector(toggleConnection)
         connectButton.bezelStyle = .rounded
-        refresh.bezelStyle = .rounded
-        ping.bezelStyle = .rounded
-        autoConnectButton.target = self; autoConnectButton.action = #selector(autoConnectChanged(_:))
-        autoConnectButton.state = UserDefaults.standard.bool(forKey: VPNDefaults.autoConnect) ? .on : .off
-        let buttons = NSStackView(views: [refresh,ping,connectButton]); buttons.orientation = .horizontal; buttons.spacing = 8
+        connectButton.keyEquivalent = "\r"
+
+        let serversHeader = sectionHeader("СЕРВЕРЫ")
         for (title, width) in [("Сервер",360.0),("Протокол",100.0),("Пинг",90.0)] { let c = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(title)); c.title=title; c.width=width; table.addTableColumn(c) }
-        table.headerView = NSTableHeaderView(); table.delegate=self; table.dataSource=self; table.usesAlternatingRowBackgroundColors=true
+        table.headerView = NSTableHeaderView(); table.delegate=self; table.dataSource=self
+        table.usesAlternatingRowBackgroundColors = true
+        table.rowHeight = 28
+        table.style = .inset
         table.doubleAction = #selector(connectFromTable(_:))    // двойной клик = подключить
         table.target = self
-        let scroll = NSScrollView(); scroll.documentView=table; scroll.hasVerticalScroller=true
-        scroll.wantsLayer = true; scroll.layer?.cornerRadius = 8
-        status.textColor = .secondaryLabelColor
+        let scroll = NSScrollView(); scroll.documentView = table; scroll.hasVerticalScroller = true
+        scroll.wantsLayer = true
+        scroll.layer?.cornerRadius = 10
+        scroll.layer?.borderWidth = 1
+        scroll.layer?.borderColor = NSColor.white.withAlphaComponent(0.06).cgColor
+        scroll.layer?.masksToBounds = true
+
         let hint = NSTextField(labelWithString: "Двойной клик по серверу — подключить.")
         hint.textColor = .tertiaryLabelColor; hint.font = .systemFont(ofSize: 11)
-        let stack = NSStackView(views:[label,keyField,autoConnectButton,buttons,scroll,status,hint]); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing=10; stack.edgeInsets=NSEdgeInsets(top:18,left:18,bottom:18,right:18); stack.translatesAutoresizingMaskIntoConstraints=false
-        content.addSubview(stack); scroll.translatesAutoresizingMaskIntoConstraints=false
-        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),stack.topAnchor.constraint(equalTo: content.topAnchor),stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),keyField.widthAnchor.constraint(equalTo: stack.widthAnchor,constant:-36),scroll.widthAnchor.constraint(equalTo: stack.widthAnchor,constant:-36),scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:280)])
+
+        statusDot.wantsLayer = true
+        statusDot.translatesAutoresizingMaskIntoConstraints = false
+        statusDot.widthAnchor.constraint(equalToConstant: 8).isActive = true
+        statusDot.heightAnchor.constraint(equalToConstant: 8).isActive = true
+        status.textColor = .secondaryLabelColor
+        status.font = .systemFont(ofSize: 12)
+        let statusRow = NSStackView(views: [statusDot, status, NSView(), connectButton])
+        statusRow.orientation = .horizontal
+        statusRow.spacing = 8
+        statusRow.alignment = .centerY
+        statusRow.translatesAutoresizingMaskIntoConstraints = false
+        statusRow.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let stack = NSStackView(views: [label, keyField, keyButtons, autoRow, separator(), serversHeader, scroll, hint, statusRow])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 10
+        stack.setCustomSpacing(4, after: keyField)
+        stack.setCustomSpacing(14, after: keyButtons)
+        stack.setCustomSpacing(14, after: autoRow)
+        stack.setCustomSpacing(14, after: serversHeader)
+        stack.setCustomSpacing(6, after: scroll)
+        stack.edgeInsets = NSEdgeInsets(top: 18, left: 18, bottom: 18, right: 18)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(stack)
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: content.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            keyField.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -36),
+            autoRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -36),
+            scroll.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -36),
+            scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 280),
+            statusRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -36),
+            refresh.widthAnchor.constraint(greaterThanOrEqualToConstant: 100)
+        ])
+        setStatus("VPN выключен")
+    }
+
+    /// Заголовок секции: маленький капс, приглушённый.
+    private func sectionHeader(_ title: String) -> NSTextField {
+        let label = NSTextField(labelWithString: title)
+        label.font = .systemFont(ofSize: 10, weight: .semibold)
+        label.textColor = .tertiaryLabelColor
+        if let attributed = label.attributedStringValue.mutableCopy() as? NSMutableAttributedString {
+            attributed.addAttribute(.kern, value: 1.2, range: NSRange(location: 0, length: attributed.length))
+            label.attributedStringValue = attributed
+        }
+        return label
+    }
+
+    private func separator() -> NSView {
+        let line = NSView()
+        line.wantsLayer = true
+        line.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.06).cgColor
+        line.translatesAutoresizingMaskIntoConstraints = false
+        line.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return line
+    }
+
+    /// Строка настройки: текст слева, элемент управления справа.
+    private func settingsRow(title: String, subtitle: String, control: NSControl) -> NSView {
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = .systemFont(ofSize: 13)
+        let subtitleLabel = NSTextField(labelWithString: subtitle)
+        subtitleLabel.font = .systemFont(ofSize: 11)
+        subtitleLabel.textColor = .secondaryLabelColor
+        let text = NSStackView(views: [titleLabel, subtitleLabel])
+        text.orientation = .vertical
+        text.alignment = .leading
+        text.spacing = 1
+        let row = NSStackView(views: [text, control])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+        row.translatesAutoresizingMaskIntoConstraints = false
+        text.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        return row
     }
 
     @objc private func connectFromTable(_ sender: Any?) {
@@ -386,7 +496,7 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
         connect(server: servers[row])
     }
 
-    @objc private func autoConnectChanged(_ sender: NSButton) {
+    @objc private func autoConnectChanged(_ sender: NSSwitch) {
         UserDefaults.standard.set(sender.state == .on, forKey: VPNDefaults.autoConnect)
     }
 
@@ -450,7 +560,13 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
         table.scrollRowToVisible(row)
     }
 
-    private func setStatus(_ text:String){status.stringValue=text}
+    private func setStatus(_ text: String) {
+        status.stringValue = text
+        // Точка статуса: зелёная — соединено, серая — выключено
+        statusDot.layer?.backgroundColor = (XrayManager.shared.isRunning
+            ? NSColor.systemGreen
+            : NSColor.systemGray).withAlphaComponent(0.9).cgColor
+    }
     func numberOfRows(in tableView:NSTableView)->Int{servers.count}
     func tableView(_ tableView:NSTableView, viewFor tableColumn:NSTableColumn?, row:Int)->NSView? { let id=tableColumn?.identifier.rawValue ?? ""; let field=NSTextField(labelWithString: id=="Сервер" ? servers[row].name : id=="Протокол" ? servers[row].scheme.uppercased() : (servers[row].pingMS.map{$0>=9999 ? "тайм-аут" : "\($0) ms"} ?? "—")); field.lineBreakMode = .byTruncatingTail; return field }
 }

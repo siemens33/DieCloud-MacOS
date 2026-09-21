@@ -32,7 +32,7 @@ private enum DefaultsKey {
     }
 }
 
-/// Единый источник флагов настроек: чекбоксы панели, UserDefaults и JS-движок
+/// Единый источник флагов настроек: тумблеры панели, UserDefaults и JS-движок
 /// работают с одним списком — новый эффект добавляется одной строкой,
 /// а не копипастой в трёх местах.
 private final class SettingsState {
@@ -40,10 +40,10 @@ private final class SettingsState {
         let key: String        // ключ UserDefaults
         let jsKey: String      // ключ в theme-engine.js
         let title: String
-        let tooltip: String
+        let tooltip: String    // показывается как описание под названием
         let defaultValue: Bool
         var value: Bool
-        weak var button: NSButton?
+        weak var control: NSControl?
     }
 
     private(set) var flags: [Flag]
@@ -93,13 +93,22 @@ private final class SettingsState {
         UserDefaults.standard.set(value, forKey: flags[index].key)
     }
 
-    func jsKey(of button: NSButton) -> String? {
-        flags.first { $0.button === button }?.jsKey
+    func jsKey(of control: NSControl) -> String? {
+        flags.first { $0.control === control }?.jsKey
     }
 
     func syncButton(for jsKey: String) {
         guard let index = flags.firstIndex(where: { $0.jsKey == jsKey }) else { return }
-        flags[index].button?.state = flags[index].value ? .on : .off
+        applyValue(flags[index].value, to: flags[index].control)
+    }
+
+    private func applyValue(_ value: Bool, to control: NSControl?) {
+        let state: NSControl.StateValue = value ? .on : .off
+        if let sw = control as? NSSwitch {
+            sw.state = state
+        } else if let button = control as? NSButton {
+            button.state = state
+        }
     }
 
     /// Сброс дизайн-настроек (не трогает focus и adBlock).
@@ -107,7 +116,7 @@ private final class SettingsState {
         for index in flags.indices where flags[index].jsKey != "focus" && flags[index].jsKey != "adBlock" {
             flags[index].value = flags[index].defaultValue
             UserDefaults.standard.set(flags[index].defaultValue, forKey: flags[index].key)
-            flags[index].button?.state = flags[index].defaultValue ? .on : .off
+            applyValue(flags[index].defaultValue, to: flags[index].control)
         }
         setAccent("mono")
         accentPopup?.selectItem(at: 0)
@@ -140,13 +149,24 @@ private final class SettingsState {
         UserDefaults.standard.set(accent, forKey: DefaultsKey.accent)
     }
 
-    func makeCheckbox(for jsKey: String, action: Selector, target: AnyObject) -> NSButton? {
+    /// Тумблер настройки: подсказка флага становится видимым описанием строки.
+    func makeSwitch(for jsKey: String, action: Selector, target: AnyObject) -> NSSwitch? {
         guard let index = flags.firstIndex(where: { $0.jsKey == jsKey }) else { return nil }
-        let button = NSButton(checkboxWithTitle: flags[index].title, target: target, action: action)
-        button.state = flags[index].value ? .on : .off
-        button.toolTip = flags[index].tooltip
-        flags[index].button = button
-        return button
+        let sw = NSSwitch()
+        sw.controlSize = .small
+        sw.state = flags[index].value ? .on : .off
+        sw.target = target
+        sw.action = action
+        flags[index].control = sw
+        return sw
+    }
+
+    func title(for jsKey: String) -> String {
+        flags.first { $0.jsKey == jsKey }?.title ?? jsKey
+    }
+
+    func subtitle(for jsKey: String) -> String {
+        flags.first { $0.jsKey == jsKey }?.tooltip ?? ""
     }
 
     private func load() {
@@ -168,16 +188,18 @@ private extension NSColor {
     }
 }
 
-/// Кнопка тулбара с мягкой подсветкой при наведении — как нативные
-/// macOS-кнопки, только спокойнее: без рамок, только плавная прозрачность.
+/// Кнопка тулбара: в покое полупрозрачная, при наведении проявляется
+/// и подсвечивается мягкой круглой пилюлей — тихо и по-нативному.
 private final class ToolbarButton: NSButton {
     private var trackingArea: NSTrackingArea?
-    private var hovered = false
-    private let idleAlpha: CGFloat = 0.62
-    private let idleDisabledAlpha: CGFloat = 0.24
+    private let idleAlpha: CGFloat = 0.6
+    private let idleDisabledAlpha: CGFloat = 0.22
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 8
+        layer?.masksToBounds = true
         alphaValue = idleAlpha
         focusRingType = .none
     }
@@ -190,30 +212,36 @@ private final class ToolbarButton: NSButton {
         let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self, userInfo: nil)
         trackingArea = area
         addTrackingArea(area)
-        hovered = false
         alphaValue = isEnabled ? idleAlpha : idleDisabledAlpha
+        setHoverBackground(false)
     }
 
     override func mouseEntered(with event: NSEvent) {
-        hovered = true
         animateAlpha(to: isEnabled ? 1 : idleDisabledAlpha)
+        setHoverBackground(isEnabled)
     }
 
     override func mouseExited(with event: NSEvent) {
-        hovered = false
         animateAlpha(to: isEnabled ? idleAlpha : idleDisabledAlpha)
+        setHoverBackground(false)
     }
 
     override var isEnabled: Bool {
         didSet {
             guard oldValue != isEnabled else { return }
             animateAlpha(to: isEnabled ? idleAlpha : idleDisabledAlpha)
+            if !isEnabled { setHoverBackground(false) }
         }
     }
 
-    private func setAlpha(_ enabledState: Bool, animated: Bool) {
-        let target = enabledState ? idleAlpha : idleDisabledAlpha
-        if animated { animateAlpha(to: target) } else { alphaValue = target }
+    private func setHoverBackground(_ visible: Bool) {
+        guard let layer else { return }
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(0.15)
+        layer.backgroundColor = visible
+            ? NSColor.white.withAlphaComponent(0.09).cgColor
+            : NSColor.clear.cgColor
+        CATransaction.commit()
     }
 
     private func animateAlpha(to value: CGFloat) {
@@ -396,8 +424,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let info = symbolButton("slider.horizontal.3", action: #selector(toggleInfoPanel(_:)), tooltip: "Настройки (⌘,)")
 
         titleLabel = NSTextField(labelWithString: AppConfig.name)
-        titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        titleLabel.textColor = .labelColor
+        titleLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        titleLabel.textColor = .secondaryLabelColor
         titleLabel.alignment = .center
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -475,27 +503,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         sidePanel.blendingMode = .withinWindow
         sidePanel.state = .active
         sidePanel.wantsLayer = true
-        sidePanel.layer?.cornerRadius = 22
+        sidePanel.layer?.cornerRadius = 20
         sidePanel.layer?.masksToBounds = true
         sidePanel.layer?.borderWidth = 1
-        sidePanel.layer?.borderColor = NSColor.separatorColor.cgColor
-        sidePanel.layer?.shadowOpacity = 0.28
-        sidePanel.layer?.shadowRadius = 26
+        sidePanel.layer?.borderColor = NSColor.white.withAlphaComponent(0.07).cgColor
+        sidePanel.layer?.shadowOpacity = 0.3
+        sidePanel.layer?.shadowRadius = 28
         sidePanel.layer?.shadowOffset = NSSize(width: -8, height: 0)
         sidePanel.layer?.shadowColor = NSColor.black.cgColor
         sidePanel.alphaValue = 0
         sidePanel.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(sidePanel, positioned: .above, relativeTo: webView)
 
+        // Заголовок панели: иконка + имя + строка статуса движка
         let icon = NSImageView()
         icon.image = NSApp.applicationIconImage
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.translatesAutoresizingMaskIntoConstraints = false
         let name = NSTextField(labelWithString: AppConfig.name)
-        name.font = .systemFont(ofSize: 26, weight: .bold)
-        engineStatusLabel = NSTextField(labelWithString: "Настройки · ⌘, — применяются сразу")
+        name.font = .systemFont(ofSize: 19, weight: .semibold)
+        engineStatusLabel = NSTextField(labelWithString: "Применяется сразу, без перезагрузки")
         engineStatusLabel.textColor = .secondaryLabelColor
-        engineStatusLabel.font = .systemFont(ofSize: 12)
+        engineStatusLabel.font = .systemFont(ofSize: 11)
         let headerText = NSStackView(views: [name, engineStatusLabel])
         headerText.orientation = .vertical
         headerText.alignment = .leading
@@ -505,52 +534,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         header.alignment = .centerY
         header.spacing = 12
 
+        // Секция «Внешний вид»: строки с тумблерами + акцент + сброс
         let toggleAction = #selector(toggleFlag(_:))
-        let designViews: [NSView] = [
-            settings.makeCheckbox(for: "modernDesign", action: toggleAction, target: self),
-            settings.makeCheckbox(for: "theme", action: toggleAction, target: self),
-            settings.makeCheckbox(for: "roundedCards", action: toggleAction, target: self),
-            settings.makeCheckbox(for: "artworkHover", action: toggleAction, target: self),
-            settings.makeCheckbox(for: "compactMode", action: toggleAction, target: self)
-        ].compactMap { $0 }
-        // Выбор цветового акцента: строки popup совпадают по индексам с accentValues
+        let designRows: [NSView] = ["modernDesign", "theme", "roundedCards", "artworkHover", "compactMode"].compactMap {
+            guard let sw = settings.makeSwitch(for: $0, action: toggleAction, target: self) else { return nil }
+            return settingsRow(title: settings.title(for: $0), subtitle: settings.subtitle(for: $0), control: sw)
+        }
         let accentPopup = settings.makeAccentPopup(action: #selector(changeAccent(_:)), target: self)
-        accentPopup.widthAnchor.constraint(equalToConstant: 190).isActive = true
-        let accentLabel = NSTextField(labelWithString: "Цветовой акцент")
-        let accentRow = NSStackView(views: [accentLabel, accentPopup])
-        accentRow.orientation = .horizontal
-        accentRow.spacing = 10
-        accentRow.alignment = .centerY
+        accentPopup.widthAnchor.constraint(equalToConstant: 176).isActive = true
+        let accentRow = settingsRow(title: "Цветовой акцент",
+                                    subtitle: "Кнопки, шкала времени и громкость",
+                                    control: accentPopup)
         let reset = NSButton(title: "Сбросить оформление", target: self, action: #selector(resetDesignSettings(_:)))
-        reset.bezelStyle = .rounded
-        reset.controlSize = .regular
-        let designBox = groupBox(title: "Внешний вид", views: designViews + [accentRow, reset])
+        reset.bezelStyle = .inline
+        reset.controlSize = .small
+        reset.contentTintColor = .secondaryLabelColor
+        let designSection = section(header: "Внешний вид", rows: designRows + [accentRow], footer: reset)
 
-        let listeningViews: [NSView] = [
-            settings.makeCheckbox(for: "focus", action: toggleAction, target: self),
-            settings.makeCheckbox(for: "adBlock", action: toggleAction, target: self)
-        ].compactMap { $0 }
-        let listeningBox = groupBox(title: "Прослушивание", views: listeningViews)
+        // Секция «Прослушивание»
+        let listeningRows: [NSView] = ["focus", "adBlock"].compactMap {
+            guard let sw = settings.makeSwitch(for: $0, action: toggleAction, target: self) else { return nil }
+            return settingsRow(title: settings.title(for: $0), subtitle: settings.subtitle(for: $0), control: sw)
+        }
+        let listeningSection = section(header: "Прослушивание", rows: listeningRows, footer: nil)
 
-        let version = NSTextField(labelWithString: "Версия \(AppConfig.version) (\(AppConfig.build))")
+        // Секция «О программе»
+        let version = NSTextField(labelWithString: "Версия \(AppConfig.version) (\(AppConfig.build)) · \(AppConfig.author)")
         version.textColor = .secondaryLabelColor
-        version.font = .systemFont(ofSize: 12)
-        let author = NSTextField(labelWithString: AppConfig.author)
-        author.textColor = .tertiaryLabelColor
-        author.font = .systemFont(ofSize: 12)
+        version.font = .systemFont(ofSize: 11)
         let updateButton = NSButton(title: "Проверить обновления…", target: self, action: #selector(checkForUpdates(_:)))
-        updateButton.bezelStyle = .rounded
-        let aboutBox = groupBox(title: "О программе", views: [version, author, updateButton])
+        updateButton.bezelStyle = .inline
+        updateButton.controlSize = .small
+        updateButton.contentTintColor = .secondaryLabelColor
+        let aboutSection = section(header: "О программе", rows: [version], footer: updateButton)
+
         let close = symbolButton("xmark", action: #selector(toggleInfoPanel(_:)), tooltip: "Закрыть")
 
-        let stack = NSStackView(views: [header, designBox, listeningBox, aboutBox])
+        let stack = NSStackView(views: [header, separator(), designSection, separator(), listeningSection, separator(), aboutSection])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 14
-        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+        stack.spacing = 16
+        stack.edgeInsets = NSEdgeInsets(top: 22, left: 22, bottom: 22, right: 22)
         stack.translatesAutoresizingMaskIntoConstraints = false
-        for fullWidth in [header, designBox, listeningBox, aboutBox] as [NSView] {
-            fullWidth.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
+        for fullWidth in [header, designSection, listeningSection, aboutSection] as [NSView] {
+            fullWidth.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -44).isActive = true
+            fullWidth.setContentHuggingPriority(.defaultLow, for: .horizontal)
         }
 
         let scroll = NSScrollView()
@@ -565,7 +593,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         NSLayoutConstraint.activate([
             sidePanel.topAnchor.constraint(equalTo: root.topAnchor, constant: 94),
             sidePanel.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -18),
-            sidePanel.widthAnchor.constraint(equalToConstant: 470),
+            sidePanel.widthAnchor.constraint(equalToConstant: 440),
             sidePanelTrailing,
             scroll.topAnchor.constraint(equalTo: sidePanel.topAnchor),
             scroll.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor),
@@ -575,32 +603,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             stack.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
             stack.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
             stack.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 56),
-            icon.heightAnchor.constraint(equalToConstant: 56),
+            icon.widthAnchor.constraint(equalToConstant: 44),
+            icon.heightAnchor.constraint(equalToConstant: 44),
             close.topAnchor.constraint(equalTo: sidePanel.topAnchor, constant: 14),
             close.trailingAnchor.constraint(equalTo: sidePanel.trailingAnchor, constant: -14)
         ])
     }
 
-    private func groupBox(title: String, views: [NSView]) -> NSBox {
-        let box = NSBox()
-        box.title = title
-        box.boxType = .primary
-        box.translatesAutoresizingMaskIntoConstraints = false
-        let inner = NSStackView(views: views)
-        inner.orientation = .vertical
-        inner.alignment = .leading
-        inner.spacing = 8
-        inner.translatesAutoresizingMaskIntoConstraints = false
-        guard let content = box.contentView else { return box }
-        content.addSubview(inner)
-        NSLayoutConstraint.activate([
-            inner.topAnchor.constraint(equalTo: content.topAnchor, constant: 10),
-            inner.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
-            inner.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
-            inner.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12)
-        ])
-        return box
+    /// Заголовок секции: маленький капс, приглушённый — вместо рамок NSBox.
+    private func section(header title: String, rows: [NSView], footer: NSView?) -> NSView {
+        let label = NSTextField(labelWithString: title.uppercased())
+        label.font = .systemFont(ofSize: 10, weight: .semibold)
+        label.textColor = .tertiaryLabelColor
+        if let attributed = label.attributedStringValue.mutableCopy() as? NSMutableAttributedString {
+            attributed.addAttribute(.kern, value: 1.2, range: NSRange(location: 0, length: attributed.length))
+            label.attributedStringValue = attributed
+        }
+        let stack = NSStackView(views: [label] + rows)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        if let footer {
+            stack.addArrangedSubview(footer)
+            stack.setCustomSpacing(12, after: rows.last ?? label)
+        }
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        for row in rows {
+            row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+        return stack
+    }
+
+    private func separator() -> NSView {
+        let line = NSView()
+        line.wantsLayer = true
+        line.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.06).cgColor
+        line.translatesAutoresizingMaskIntoConstraints = false
+        line.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return line
+    }
+
+    /// Строка настройки: название + описание слева, элемент управления справа.
+    private func settingsRow(title: String, subtitle: String, control: NSControl) -> NSView {
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        titleLabel.lineBreakMode = .byTruncatingTail
+        let subtitleLabel = NSTextField(labelWithString: subtitle)
+        subtitleLabel.font = .systemFont(ofSize: 11)
+        subtitleLabel.textColor = .secondaryLabelColor
+        subtitleLabel.lineBreakMode = .byWordWrapping
+        subtitleLabel.maximumNumberOfLines = 2
+        let text = NSStackView(views: [titleLabel, subtitleLabel])
+        text.orientation = .vertical
+        text.alignment = .leading
+        text.spacing = 1
+        let row = NSStackView(views: [text, control])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+        row.translatesAutoresizingMaskIntoConstraints = false
+        text.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        control.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return row
     }
 
     private func symbolButton(_ symbol: String, action: Selector, tooltip: String) -> NSButton {
@@ -610,8 +675,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         button.imagePosition = .imageOnly
         button.toolTip = tooltip
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.widthAnchor.constraint(equalToConstant: 32).isActive = true
-        button.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        button.widthAnchor.constraint(equalToConstant: 30).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 30).isActive = true
         return button
     }
 
@@ -707,8 +772,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     // MARK: - Переключатели настроек
 
-    @objc private func toggleFlag(_ sender: NSButton) {
-        let on = sender.state == .on
+    @objc private func toggleFlag(_ sender: NSControl) {
+        let on: Bool
+        if let sw = sender as? NSSwitch {
+            on = sw.state == .on
+        } else if let button = sender as? NSButton {
+            on = button.state == .on
+        } else {
+            return
+        }
         guard let jsKey = settings.jsKey(of: sender) else { return }
         settings.setValue(on, for: jsKey)
         if jsKey == "adBlock" {
