@@ -5,7 +5,7 @@
 <title>DieCloude player mock</title>
 <style>
   /* Мок нижней панели SoundCloud для визуальной проверки матового стекла.
-     Структура повторяет реальную: footer > .playControls > внутренности. */
+     Структура повторяет реальную: div.playControls (fixed) > section.playControls__inner > внутренности. */
   html, body { margin: 0; height: 100%; background: #090a0d; color: #f5f5f7; font: 13px -apple-system; }
   .page { padding: 24px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 28px 20px; }
   .card .art {
@@ -20,12 +20,19 @@
   .stripe { position: absolute; left: 0; right: 0; bottom: 0; height: 170px;
     background: linear-gradient(90deg, #e0562f, #d9a12b, #3f9c6d, #3366cc, #8d4bcc); opacity: .85; }
 
-  footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; }
-  .playControls { display: flex; align-items: center; gap: 18px; padding: 12px 18px; }
+  /* Панель как в реальном SoundCloud: fixed .playControls (прозрачный),
+     внутри section.playControls__inner[role=contentinfo] с плотным фоном.
+     Кнопка play — родной белый круг с чёрной иконкой. */
+  .playControls { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001; }
+  .playControls__inner {
+    display: flex; align-items: center; gap: 18px; padding: 12px 18px;
+    background: rgb(48, 48, 48);
+  }
   .playControls__buttons { display: flex; gap: 14px; align-items: center; }
   .playControls__play {
-    width: 40px; height: 40px; border-radius: 50%; background: #ff5500 !important;
-    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 17px;
+    width: 40px; height: 40px; border-radius: 50%; background: rgb(255,255,255);
+    display: flex; align-items: center; justify-content: center; color: #000; font-size: 17px;
+    border: none; cursor: pointer;
   }
   .ctl { font-size: 16px; opacity: .9; }
   .playbackTimeline { flex: 1; display: flex; align-items: center; gap: 10px; }
@@ -55,11 +62,11 @@
     <div class="card"><div class="art"></div><div class="t">Финальный</div><div class="a">Состав</div></div>
   </div>
 
-  <footer>
-    <div class="playControls">
+  <div class="playControls">
+    <section class="playControls__inner" role="contentinfo">
       <div class="playControls__buttons">
         <span class="ctl">⏮</span>
-        <div class="playControls__play">⏸</div>
+        <button class="playControls__play">⏸</button>
         <span class="ctl">⏭</span>
         <span class="ctl">🔀</span>
         <span class="ctl">🔁</span>
@@ -78,6 +85,7 @@
         </div>
       </div>
     </div>
-  </footer>
+    </section>
+  </div>
 </body>
 </html>

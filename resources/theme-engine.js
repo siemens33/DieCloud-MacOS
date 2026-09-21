@@ -185,15 +185,17 @@
       html.dc-modern ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,.24); }
 
       /* ─────────────────────────────────────────────────────────────
-         МАТОВЫЙ ПЛЕЕР. Явные селекторы без :is()-трюков: красим и
-         внешнюю плиту, и саму планку — что нашлось, то и станет
-         стеклом. Через полупрозрачную базу (0.72) просвечивает
-         размытый контент — как на референсе. Покой и hover идентичны.
+         МАТОВЫЙ ПЛЕЕР. Реальная разметка SoundCloud (проверено в
+         живом DOM): панель — это div.playControls (position:fixed),
+         внутри section.playControls__inner[role=contentinfo] с плотным
+         серым фоном; <footer> на странице нет. Стекло кладём на сам
+         .playControls (и теги движка), всё внутри — прозрачное, кроме
+         шкалы/громкости (их красим отдельно) и родной белой кнопки
+         .playControls__play — её не трогаем вовсе.
          ───────────────────────────────────────────────────────────── */
       html.dc-modern [data-dc-player],
       html.dc-modern [data-dc-playerbar],
-      html.dc-modern footer,
-      html.dc-modern [class*="playControls" i],
+      html.dc-modern .playControls,
       html.dc-modern [data-testid="play-controls"],
       html.dc-modern [data-dc-player]:hover,
       html.dc-modern [data-dc-player]:focus-within,
@@ -201,12 +203,12 @@
       html.dc-modern [data-dc-playerbar]:hover,
       html.dc-modern [data-dc-playerbar]:focus-within,
       html.dc-modern [data-dc-playerbar]:active,
-      html.dc-modern footer:hover,
-      html.dc-modern footer:focus-within,
-      html.dc-modern footer:active,
-      html.dc-modern [class*="playControls" i]:hover,
-      html.dc-modern [class*="playControls" i]:focus-within,
-      html.dc-modern [class*="playControls" i]:active {
+      html.dc-modern .playControls:hover,
+      html.dc-modern .playControls:focus-within,
+      html.dc-modern .playControls:active,
+      html.dc-modern [data-testid="play-controls"]:hover,
+      html.dc-modern [data-testid="play-controls"]:focus-within,
+      html.dc-modern [data-testid="play-controls"]:active {
         background-color: rgba(15,16,20,.72) !important;
         background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 46%) !important;
         -webkit-backdrop-filter: blur(30px) saturate(150%) !important;
@@ -217,50 +219,48 @@
       }
 
       /* Внутренности планки — прозрачные, чтобы не перекрывать стекло.
-         Обложки с background-image не трогаем — их красит dc-rounded. */
-      html.dc-modern [data-dc-player] > *,
-      html.dc-modern [data-dc-playerbar] > *,
-      html.dc-modern footer > *,
-      html.dc-modern [data-dc-player] [class*="playControls__"],
-      html.dc-modern [data-dc-playerbar] [class*="playControls__"],
-      html.dc-modern [data-dc-player] [class*="playbackSoundBadge"],
-      html.dc-modern [data-dc-playerbar] [class*="playbackSoundBadge"],
+         Обложки с background-image не трогаем — их красит dc-rounded.
+         Родная круглая кнопка .playControls__play исключена: её белый
+         фон и чёрную иконку рисует сам SoundCloud, вмешательство
+         оставляет кривую обводку. */
+      html.dc-modern [data-dc-player] > *:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-playerbar] > *:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-player] [class*="playControls__"]:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-playerbar] [class*="playControls__"]:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-player] [class*="playbackSoundBadge"]:not(button),
+      html.dc-modern [data-dc-playerbar] [class*="playbackSoundBadge"]:not(button),
       html.dc-modern footer div:not([style*="background-image"]),
       html.dc-modern footer section:not([style*="background-image"]),
-      html.dc-modern [data-dc-player]:hover > *,
-      html.dc-modern [data-dc-playerbar]:hover > *,
-      html.dc-modern footer:hover > *,
-      html.dc-modern [data-dc-player]:hover [class*="playControls__"],
-      html.dc-modern [data-dc-playerbar]:hover [class*="playControls__"],
-      html.dc-modern [data-dc-player]:hover [class*="playbackSoundBadge"],
-      html.dc-modern [data-dc-playerbar]:hover [class*="playbackSoundBadge"] {
+      html.dc-modern [data-dc-player]:hover > *:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-playerbar]:hover > *:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-player]:hover [class*="playControls__"]:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-playerbar]:hover [class*="playControls__"]:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-player]:hover [class*="playbackSoundBadge"]:not(button),
+      html.dc-modern [data-dc-playerbar]:hover [class*="playbackSoundBadge"]:not(button) {
         background-color: transparent !important;
         background-image: none !important;
       }
-      html.dc-modern [data-dc-player] button,
-      html.dc-modern [data-dc-player] a,
-      html.dc-modern [data-dc-player] [role="button"],
-      html.dc-modern [data-dc-playerbar] button,
-      html.dc-modern [data-dc-playerbar] a,
-      html.dc-modern [data-dc-playerbar] [role="button"],
+      html.dc-modern [data-dc-player] button:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-player] a:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-player] [role="button"]:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-playerbar] button:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-playerbar] a:not([class*="playControls__play"]),
+      html.dc-modern [data-dc-playerbar] [role="button"]:not([class*="playControls__play"]),
       html.dc-modern footer button,
       html.dc-modern footer a,
-      html.dc-modern footer [role="button"],
-      html.dc-modern [class*="playControls" i] button,
-      html.dc-modern [class*="playControls" i] a,
-      html.dc-modern [class*="playControls" i] [role="button"] {
+      html.dc-modern footer [role="button"] {
         background-color: transparent !important;
         background-image: none !important;
         box-shadow: none !important;
         border-color: transparent !important;
         transition: opacity var(--dc-fast) !important;
       }
-      html.dc-modern [data-dc-player] button:hover,
-      html.dc-modern [data-dc-player] a:hover,
-      html.dc-modern [data-dc-player] [role="button"]:hover,
-      html.dc-modern [data-dc-playerbar] button:hover,
-      html.dc-modern [data-dc-playerbar] a:hover,
-      html.dc-modern [data-dc-playerbar] [role="button"]:hover,
+      html.dc-modern [data-dc-player] button:not([class*="playControls__play"]):hover,
+      html.dc-modern [data-dc-player] a:not([class*="playControls__play"]):hover,
+      html.dc-modern [data-dc-player] [role="button"]:not([class*="playControls__play"]):hover,
+      html.dc-modern [data-dc-playerbar] button:not([class*="playControls__play"]):hover,
+      html.dc-modern [data-dc-playerbar] a:not([class*="playControls__play"]):hover,
+      html.dc-modern [data-dc-playerbar] [role="button"]:not([class*="playControls__play"]):hover,
       html.dc-modern footer button:hover,
       html.dc-modern footer a:hover,
       html.dc-modern footer [role="button"]:hover {
@@ -335,13 +335,13 @@
         color: var(--dc-accent) !important;
         fill: var(--dc-accent) !important;
       }
-      html.dc-theme .sc-button-play,
+      html.dc-theme .sc-button-play:not([class*="playControls__play"]),
       html.dc-theme .playButton {
         background-color: rgba(12,13,17,.55) !important;
         border: 1px solid var(--dc-accent-border) !important;
         box-shadow: 0 4px 18px rgba(0,0,0,.35) !important;
       }
-      html.dc-theme .sc-button-play:hover,
+      html.dc-theme .sc-button-play:not([class*="playControls__play"]):hover,
       html.dc-theme .playButton:hover {
         background-color: rgba(20,21,27,.7) !important;
         border-color: var(--dc-accent) !important;
