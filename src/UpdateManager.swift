@@ -27,7 +27,7 @@ final class UpdateManager {
             return
         }
         guard let url = URL(string: "https://api.github.com/repos/\(owner)/\(repository)/releases/latest") else { return }
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("DieCloude/\(AppConfig.version)", forHTTPHeaderField: "User-Agent")

@@ -1,6 +1,10 @@
 (() => {
   'use strict';
 
+  // DieCloude 4.0.2 — theme engine
+  // Архитектура прежняя (теги + MutationObserver + один <style>),
+  // обновлён матовый плеер и монохромные акценты.
+
   const initial = __SETTINGS__;
   const previous = window.__diecloudeThemeEngine;
   if (previous && typeof previous.destroy === 'function') previous.destroy();
@@ -11,7 +15,9 @@
 
   const selectors = {
     header: '.header, header[role="banner"]',
-    player: '.playControls, .playControls__inner, [data-testid="play-controls"]',
+    // Только сама планка .playControls — внутренние .playControls__*
+    // перекрашивать не нужно: за них отвечает родительская плита.
+    player: '.playControls, [data-testid="play-controls"]',
     playerBar: 'footer, [role="contentinfo"], .player, .player__container',
     artwork: [
       '.sound__coverArt',
@@ -121,90 +127,72 @@
         color: var(--dc-muted) !important;
       }
 
-      /* Matte player: видимое матовое стекло даже на чёрном фоне —
-         свой sheen-градиент + blur. Селекторы с запасом: data-атрибуты,
-         нативный footer, подстрока playControls и testid — классы SoundCloud
-         меняются, а панель должна краситься всегда. Покой и hover/focus
-         идентичны, чтобы эффект не слетал при наведении. */
-      html.dc-modern [data-dc-player],
+      /* Мягкая подсветка строк трек-листа при наведении */
+      html.dc-modern .trackList__item:hover,
+      html.dc-modern .trackListItem:hover,
+      html.dc-modern .trackList__item:focus-within {
+        background-color: rgba(255,255,255,.035) !important;
+      }
+
+      /* ─────────────────────────────────────────────────────────────
+         МАТОВЫЙ ПЛЕЕР — два слоя настоящего стекла.
+
+         Внешняя плита ([data-dc-playerbar], footer) — матовая основа:
+         полупрозрачная тёмная заливка + сильный backdrop-blur и лёгкая
+         перенасыщенность под ним, тонкий верхний хайлайт и хайрлайн.
+         Внутренняя планка ([data-dc-player] без playerbar) — едва
+         заметная вуаль, приглушающая родной фон SoundCloud, чтобы blur
+         оставался видимым. Покой и hover идентичны — эффект не
+         «слетает» при наведении.
+         ───────────────────────────────────────────────────────────── */
       html.dc-modern [data-dc-playerbar],
       html.dc-modern footer,
-      html.dc-modern [class*="playControls" i],
-      html.dc-modern [data-testid="play-controls"] {
-        background-color: rgba(28,29,37,.88) !important;
-        background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 42%) !important;
-        -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
-        backdrop-filter: blur(24px) saturate(160%) !important;
+      html.dc-modern :is([data-dc-playerbar], footer):is(:hover, :focus-within, :active) {
+        background-color: rgba(24,25,32,.62) !important;
+        background-image:
+          linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.012) 38%, rgba(255,255,255,0) 62%) !important;
+        -webkit-backdrop-filter: blur(28px) saturate(165%) !important;
+        backdrop-filter: blur(28px) saturate(165%) !important;
         border-top: 1px solid rgba(255,255,255,.14) !important;
-        box-shadow: 0 -10px 34px rgba(0,0,0,.35) !important;
+        box-shadow: 0 -12px 40px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.05) !important;
         isolation: isolate !important;
-        transition-property: opacity, border-color, box-shadow !important;
       }
-      html.dc-modern [data-dc-player]:hover,
-      html.dc-modern [data-dc-player]:focus-within,
-      html.dc-modern [data-dc-player]:active,
-      html.dc-modern [data-dc-playerbar]:hover,
-      html.dc-modern [data-dc-playerbar]:focus-within,
-      html.dc-modern [data-dc-playerbar]:active,
-      html.dc-modern footer:hover,
-      html.dc-modern footer:focus-within,
-      html.dc-modern footer:active,
-      html.dc-modern [class*="playControls" i]:hover,
-      html.dc-modern [class*="playControls" i]:focus-within,
-      html.dc-modern [class*="playControls" i]:active,
-      html.dc-modern [data-testid="play-controls"]:hover,
-      html.dc-modern [data-testid="play-controls"]:focus-within,
-      html.dc-modern [data-testid="play-controls"]:active {
-        background-color: rgba(28,29,37,.88) !important;
-        background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 42%) !important;
-        -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
-        backdrop-filter: blur(24px) saturate(160%) !important;
-        border-top: 1px solid rgba(255,255,255,.14) !important;
-        box-shadow: 0 -10px 34px rgba(0,0,0,.35) !important;
+
+      /* Внутренняя планка плеера: вуаль без собственного blur,
+         чтобы стекло не складывалось дважды. Если парент-плиты нет
+         (структурный поиск пометил сам бар) — атрибут playerbar на нём,
+         и правило выше красит его как основу. */
+      html.dc-modern [data-dc-player]:not([data-dc-playerbar]) {
+        background-color: rgba(16,17,23,.34) !important;
+        background-image: none !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        border-top-color: transparent !important;
+        box-shadow: none !important;
       }
+
       /* Внутренности планки — прозрачные, чтобы не перекрывать стекло.
          Обложки с background-image не трогаем — их красит dc-rounded. */
-      html.dc-modern [data-dc-player] > *,
-      html.dc-modern [data-dc-playerbar] > *,
-      html.dc-modern footer > *,
-      html.dc-modern [data-dc-player] [class*="playControls__"],
-      html.dc-modern [data-dc-playerbar] [class*="playControls__"],
-      html.dc-modern [data-dc-player] [class*="playbackSoundBadge"],
-      html.dc-modern [data-dc-playerbar] [class*="playbackSoundBadge"],
-      html.dc-modern footer div:not([style*="background-image"]),
-      html.dc-modern footer section:not([style*="background-image"]),
-      html.dc-modern [data-dc-player]:hover > *,
-      html.dc-modern [data-dc-playerbar]:hover > *,
-      html.dc-modern footer:hover > *,
-      html.dc-modern [data-dc-player]:hover [class*="playControls__"],
-      html.dc-modern [data-dc-playerbar]:hover [class*="playControls__"],
-      html.dc-modern [data-dc-player]:hover [class*="playbackSoundBadge"],
-      html.dc-modern [data-dc-playerbar]:hover [class*="playbackSoundBadge"] {
+      html.dc-modern :is([data-dc-playerbar], footer):is(> *, :hover > *) div:not([style*="background-image"]),
+      html.dc-modern :is([data-dc-playerbar], footer):is(> *, :hover > *) section:not([style*="background-image"]),
+      html.dc-modern :is([data-dc-player], [data-dc-playerbar]):is([class*="playControls__"], :hover [class*="playControls__"]),
+      html.dc-modern :is([data-dc-player], [data-dc-playerbar]) :is([class*="playControls__"], [class*="playbackSoundBadge"], :hover [class*="playControls__"]) {
         background-color: transparent !important;
         background-image: none !important;
       }
-      html.dc-modern [data-dc-player] button,
-      html.dc-modern [data-dc-player] a,
-      html.dc-modern [data-dc-player] [role="button"],
-      html.dc-modern footer button,
-      html.dc-modern footer a,
-      html.dc-modern footer [role="button"] {
+      html.dc-modern :is([data-dc-playerbar], footer, [data-dc-player]) :is(button, a, [role="button"]),
+      html.dc-modern :is([data-dc-playerbar], footer, [data-dc-player]) :is(button, a, [role="button"]):hover {
         background-color: transparent !important;
         background-image: none !important;
         box-shadow: none !important;
         border-color: transparent !important;
         transition: opacity var(--dc-fast) !important;
       }
-      html.dc-modern [data-dc-player] button:hover,
-      html.dc-modern [data-dc-player] a:hover,
-      html.dc-modern [data-dc-player] [role="button"]:hover,
-      html.dc-modern footer button:hover,
-      html.dc-modern footer a:hover,
-      html.dc-modern footer [role="button"]:hover {
-        opacity: .88 !important;
+      html.dc-modern :is([data-dc-playerbar], footer, [data-dc-player]) :is(button, a, [role="button"]):hover {
+        opacity: .82 !important;
       }
 
-      /* Do not reposition the native SoundCloud timeline. Only recolor it. */
+      /* Нативная шкала времени: позицию не трогаем, только цвет */
       html.dc-modern .playbackTimeline__progressBackground {
         background-color: rgba(255,255,255,.16) !important;
         border-radius: 999px !important;
@@ -219,7 +207,24 @@
         border-color: #fff !important;
         box-shadow: none !important;
       }
+      /* Ползунок громкости — в ту же белую гамму */
+      html.dc-modern .volume__sliderRange,
+      html.dc-modern .volume[data-level] .sliderContainer {
+        background-color: rgba(255,255,255,.16) !important;
+        border-radius: 999px !important;
+      }
+      html.dc-modern .volume__sliderProgress {
+        background-color: #fff !important;
+        border-radius: 999px !important;
+      }
+      html.dc-modern .volume__sliderHandle {
+        background-color: #fff !important;
+        border-color: #fff !important;
+        box-shadow: none !important;
+      }
 
+      /* Белый фирменный акцент: CTA-кнопки и круглые play-кнопки
+         на обложках становятся монохромными. */
       html.dc-theme .header__goUpsell,
       html.dc-theme .sc-button-cta,
       html.dc-theme .sc-button-primary {
@@ -237,8 +242,17 @@
       html.dc-theme .header__goUpsell *,
       html.dc-theme .sc-button-cta *,
       html.dc-theme .sc-button-primary * { color: #fff !important; fill: #fff !important; }
+      html.dc-theme :is(.sc-button-play, .playButton) {
+        background-color: rgba(12,13,17,.55) !important;
+        border: 1px solid rgba(255,255,255,.22) !important;
+        box-shadow: 0 4px 18px rgba(0,0,0,.35) !important;
+      }
+      html.dc-theme :is(.sc-button-play, .playButton):hover {
+        background-color: rgba(20,21,27,.7) !important;
+        border-color: rgba(255,255,255,.38) !important;
+      }
 
-      /* noAds V8: жёсткое скрытие рекламы даже если network-правило пропустило */
+      /* noAds V9: жёсткое скрытие рекламы даже если network-правило пропустило */
       html.dc-noads [data-dc-ad],
       html.dc-noads [data-dc-promo] {
         display: none !important;
@@ -268,14 +282,8 @@
         -webkit-mask-image: -webkit-radial-gradient(white, black) !important;
         mask-image: radial-gradient(white, black) !important;
       }
-      html.dc-rounded [data-dc-player] [data-dc-artwork],
-      html.dc-rounded [data-dc-player] [data-dc-artwork] img,
-      html.dc-rounded [data-dc-player] .image__full,
-      html.dc-rounded [data-dc-player] .sc-artwork,
-      html.dc-rounded [data-dc-playerbar] [data-dc-artwork],
-      html.dc-rounded [data-dc-playerbar] [data-dc-artwork] img,
-      html.dc-rounded [data-dc-playerbar] .image__full,
-      html.dc-rounded [data-dc-playerbar] .sc-artwork {
+      html.dc-rounded :is([data-dc-playerbar], footer, [data-dc-player]) [data-dc-artwork],
+      html.dc-rounded :is([data-dc-playerbar], footer, [data-dc-player]) :is([data-dc-artwork] img, .image__full, .sc-artwork) {
         border-radius: 8px !important;
       }
 
@@ -294,15 +302,13 @@
       }
       @media (prefers-reduced-motion: reduce) {
         html.dc-hover [data-dc-artwork],
-        html.dc-modern [data-dc-player] button,
-        html.dc-modern [data-dc-player] a,
-        html.dc-modern [data-dc-player] [role="button"] {
+        html.dc-modern :is([data-dc-playerbar], footer, [data-dc-player]) :is(button, a, [role="button"]) {
           animation: none !important;
           transition-duration: 1ms !important;
         }
       }
       @media (prefers-reduced-transparency: reduce) {
-        html.dc-modern [data-dc-player] {
+        html.dc-modern :is([data-dc-playerbar], footer) {
           -webkit-backdrop-filter: none !important;
           backdrop-filter: none !important;
           background: #0e0f13 !important;
@@ -314,7 +320,7 @@
       html.dc-compact .soundList__item,
       html.dc-compact .trackItem { margin-bottom: 12px !important; }
       html.dc-compact .soundBadge { margin-bottom: 14px !important; }
-      html.dc-compact [data-dc-player] { min-height: 46px !important; }
+      html.dc-compact :is([data-dc-playerbar], [data-dc-player]) { min-height: 46px !important; }
 
       html.dc-focus [data-dc-right-rail],
       html.dc-focus [data-dc-comments],
@@ -346,8 +352,8 @@
     markAll(scope, selectors.ads, 'data-dc-ad');
   }
 
-  // Родительская планка плеера (footer-обёртка): красится SoundCloud
-  // в сплошной цвет, поэтому помечаем и её — иначе blur перекрывается.
+  // Родительская плита плеера (footer-обёртка): на ней держится матовое
+  // стекло, поэтому помечаем и её — иначе blur перекрывается родным фоном.
   function markPlayerBar(scope) {
     try {
       const found = [];
@@ -459,7 +465,7 @@
         const btns = document.querySelectorAll('button[aria-label], [role="button"][aria-label]');
         for (const b of btns) {
           const label = (b.getAttribute('aria-label') || '').toLowerCase();
-          if (!/play|pause|воспроиз|пауз/.test(label)) continue;
+          if (!/play|pause|воспроизв|пауз/.test(label)) continue;
           let p = b.parentElement;
           for (let i = 0; i < 10 && p && p !== document.body; i++, p = p.parentElement) {
             let r;
@@ -491,7 +497,7 @@
   }
 
   function schedule(nodes) {
-    // 4.0: дебаунс 180мс, обрабатываем только добавленные узлы, не весь document
+    // Дебаунс 180мс, обрабатываем только добавленные узлы, не весь document
     if (state.timer) return;
     state.timer = setTimeout(() => {
       state.timer = 0;

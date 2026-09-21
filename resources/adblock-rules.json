@@ -400,6 +400,342 @@
   },
   {
     "trigger": {
+      "url-filter": ".*adsafeprotected\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*smartadserver\\.net.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*teads\\.tv.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*sharethrough\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*betrad\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*doubleverify\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*advertising\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*casalemedia\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*33across\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*yieldmo\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*sonobi\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*gumgum\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*spotxchange\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*springserve\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*ads\\.reddit\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
+      "url-filter": ".*analytics\\.tiktok\\.com.*",
+      "load-type": [
+        "third-party"
+      ],
+      "resource-type": [
+        "document",
+        "image",
+        "style-sheet",
+        "script",
+        "font",
+        "media",
+        "raw",
+        "popup"
+      ]
+    },
+    "action": {
+      "type": "block"
+    }
+  },
+  {
+    "trigger": {
       "url-filter": ".*soundcloud\\.com.*upsell.*",
       "resource-type": [
         "script",

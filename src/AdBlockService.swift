@@ -1,11 +1,11 @@
 import WebKit
 
-/// DieCloude 4.0 — трёхуровневый noAds:
-/// 1. Network: WKContentRuleList (adblock-rules.json, V8)
+/// DieCloude 4.0.2 — трёхуровневый noAds V9:
+/// 1. Network: WKContentRuleList (adblock-rules.json, V9)
 /// 2. Cosmetic CSS + DOM removal: theme-engine.js (selectors.ads)
 /// 3. Audio: пропуск/мут first-party прероллов в JS
 enum AdBlockService {
-    static let ruleListIdentifier = "DieCloudeAdBlockRulesV8"
+    static let ruleListIdentifier = "DieCloudeAdBlockRulesV9"
 
     /// Загружает JSON-правила из бандла (Resources/adblock-rules.json),
     /// fallback — минимальный встроенный набор чтобы noAds не молчал.

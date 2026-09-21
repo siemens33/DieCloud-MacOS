@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$ROOT/build"
 APP="$BUILD/DieCloude.app"
-VERSION="4.0.1"
+VERSION="4.0.2"
 DMG="$BUILD/DieCloude-$VERSION.dmg"
 STAGE="$BUILD/dmg-stage"
 

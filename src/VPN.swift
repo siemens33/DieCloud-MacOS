@@ -91,12 +91,14 @@ final class XrayManager {
     var isRunning: Bool { process?.isRunning == true }
 
     func stop() {
-        if let p = process, p.isRunning { p.terminate() }
-        // Даём 0.3с на graceful shutdown, затем убиваем
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            if self?.process?.isRunning == true { self?.process?.interrupt() }
-        }
+        // Держим ссылку на процесс: если просто terminate и забыть,
+        // зависшее ядро Xray могло остаться жить в системе.
+        guard let p = process else { return }
         process = nil
+        p.terminate()
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) {
+            if p.isRunning { p.interrupt() }
+        }
         try? FileManager.default.removeItem(at: configURL)
     }
 
@@ -226,7 +228,11 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
 
     init() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 680, height: 480), styleMask: [.titled,.closable,.resizable], backing: .buffered, defer: false)
-        window.title = "VPN — только DieCloude"; window.minSize = NSSize(width: 600, height: 400); window.center()
+        window.title = "VPN — только DieCloude"; window.minSize = NSSize(width: 600, height: 400)
+        // Контроллер владеет окном: после закрытия крестиком оно должно
+        // корректно открываться снова через showWindow.
+        window.isReleasedWhenClosed = false
+        window.center()
         super.init(window: window); buildUI(); restoreState()
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -235,19 +241,35 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
         guard let content = window?.contentView else { return }
         let label = NSTextField(labelWithString: "Ключ или ссылка подписки Happ")
         keyField.placeholderString = "Вставь subscription URL или ключ"; keyField.stringValue = KeychainStore.load(account: "happ-subscription") ?? ""
+        // Enter в поле ключа = «Обновить ключ»
+        keyField.target = self; keyField.action = #selector(refreshKey)
         let refresh = NSButton(title: "Обновить ключ", target: self, action: #selector(refreshKey))
         let ping = NSButton(title: "Проверить пинг", target: self, action: #selector(pingAll))
         connectButton.target = self; connectButton.action = #selector(toggleConnection)
+        connectButton.bezelStyle = .rounded
+        refresh.bezelStyle = .rounded
+        ping.bezelStyle = .rounded
         autoConnectButton.target = self; autoConnectButton.action = #selector(autoConnectChanged(_:))
         autoConnectButton.state = UserDefaults.standard.bool(forKey: VPNDefaults.autoConnect) ? .on : .off
         let buttons = NSStackView(views: [refresh,ping,connectButton]); buttons.orientation = .horizontal; buttons.spacing = 8
         for (title, width) in [("Сервер",360.0),("Протокол",100.0),("Пинг",90.0)] { let c = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(title)); c.title=title; c.width=width; table.addTableColumn(c) }
         table.headerView = NSTableHeaderView(); table.delegate=self; table.dataSource=self; table.usesAlternatingRowBackgroundColors=true
+        table.doubleAction = #selector(connectFromTable(_:))    // двойной клик = подключить
+        table.target = self
         let scroll = NSScrollView(); scroll.documentView=table; scroll.hasVerticalScroller=true
+        scroll.wantsLayer = true; scroll.layer?.cornerRadius = 8
         status.textColor = .secondaryLabelColor
-        let stack = NSStackView(views:[label,keyField,autoConnectButton,buttons,scroll,status]); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing=10; stack.edgeInsets=NSEdgeInsets(top:18,left:18,bottom:18,right:18); stack.translatesAutoresizingMaskIntoConstraints=false
+        let hint = NSTextField(labelWithString: "Двойной клик по серверу — подключить.")
+        hint.textColor = .tertiaryLabelColor; hint.font = .systemFont(ofSize: 11)
+        let stack = NSStackView(views:[label,keyField,autoConnectButton,buttons,scroll,status,hint]); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing=10; stack.edgeInsets=NSEdgeInsets(top:18,left:18,bottom:18,right:18); stack.translatesAutoresizingMaskIntoConstraints=false
         content.addSubview(stack); scroll.translatesAutoresizingMaskIntoConstraints=false
         NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),stack.topAnchor.constraint(equalTo: content.topAnchor),stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),keyField.widthAnchor.constraint(equalTo: stack.widthAnchor,constant:-36),scroll.widthAnchor.constraint(equalTo: stack.widthAnchor,constant:-36),scroll.heightAnchor.constraint(greaterThanOrEqualToConstant:280)])
+    }
+
+    @objc private func connectFromTable(_ sender: Any?) {
+        let row = table.clickedRow
+        guard row >= 0, row < servers.count else { return }
+        connect(server: servers[row])
     }
 
     @objc private func refreshKey() {
@@ -255,7 +277,7 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
         KeychainStore.save(key, account: "happ-subscription"); setStatus("Обновление…")
         if let url = URL(string:key), ["http","https"].contains(url.scheme?.lowercased() ?? "") {
             var req = URLRequest(url: url, timeoutInterval: 15)
-            req.setValue("DieCloude/4.0.0", forHTTPHeaderField: "User-Agent")
+            req.setValue("DieCloude/\(AppConfig.version)", forHTTPHeaderField: "User-Agent")
             URLSession.shared.dataTask(with:req) { [weak self] data, response, error in
                 DispatchQueue.main.async {
                     guard let self else { return }
@@ -296,7 +318,30 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
                 }
             }
         }
-        group.notify(queue: .main) { [weak self] in self?.setStatus("Проверка завершена") }
+        group.notify(queue: .main) { [weak self] in
+            guard let self else { return }
+            self.sortByPing()
+            self.setStatus("Проверка завершена")
+        }
+    }
+
+    /// Быстрые серверы — наверх; не ответившие — в конец.
+    private func sortByPing() {
+        let selected = UserDefaults.standard.string(forKey: VPNDefaults.selectedURI)
+        servers.sort { a, b in
+            switch (a.pingMS, b.pingMS) {
+            case let (l?, r?) where l != r: return l < r
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return false
+            }
+        }
+        persistServers()
+        table.reloadData()
+        if let selected, let row = servers.firstIndex(where: { $0.rawURI == selected }) {
+            table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            table.scrollRowToVisible(row)
+        }
     }
 
     private func measure(index: Int, done: @escaping () -> Void) {
@@ -389,6 +434,12 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
             servers = decoded
             table.reloadData()
             restoreSelection()
+        }
+        // Ключ сохранён, а списка ещё нет — подтягиваем подписку сразу,
+        // чтобы не жать «Обновить ключ» вручную при каждом открытии.
+        if servers.isEmpty,
+           let key = KeychainStore.load(account: "happ-subscription"), !key.isEmpty {
+            refreshKey()
         }
     }
 

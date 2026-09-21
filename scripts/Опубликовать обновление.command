@@ -70,7 +70,13 @@ if git show-ref --verify --quiet "refs/tags/v$VERSION" || gh release view "v$VER
   MAJOR=${MAJOR:-0}; MINOR=${MINOR:-0}; PATCH=${PATCH:-0}
   VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
 fi
-NEW_BUILD=$((BUILD + 1))
+# Сборку поднимаем только когда версия изменилась здесь же: если версия
+# уже поднята в файлах и ещё не публиковалась — сборка из файлов верная.
+if [[ "$VERSION" != "$CURRENT" ]]; then
+  NEW_BUILD=$((BUILD + 1))
+else
+  NEW_BUILD=$BUILD
+fi
 
 echo "Текущая версия проекта: $CURRENT (сборка $BUILD)"
 echo "Будет опубликована:      $VERSION (сборка $NEW_BUILD)"
@@ -154,14 +160,21 @@ elif [[ -f "Опубликовать обновление.command" ]]; then
   zsh -n "Опубликовать обновление.command"
 fi
 
-# Не создаём пустой релиз.
-if [[ -z "$(git status --porcelain)" ]]; then
+# Не создаём пустой релиз, если только что поднятая скриптом версия
+# не внесла изменений. Если версия уже была подготовлена в файлах
+# (подготовленный релиз) — публикуем её как есть.
+if [[ -z "$(git status --porcelain)" && "$VERSION" == "$CURRENT" ]] && \
+   git show-ref --verify --quiet "refs/tags/v$VERSION" 2>/dev/null; then
   echo '❌ Изменений для публикации нет.'
   exit 1
 fi
 
 git add -A
-git commit -m "Release DieCloude $VERSION: $NOTES"
+if git diff --cached --quiet; then
+  echo 'ℹ️ Файлы уже подготовлены к релизу — коммит не требуется.'
+else
+  git commit -m "Release DieCloude $VERSION: $NOTES"
+fi
 git push origin HEAD:main
 git tag -a "v$VERSION" -m "$NOTES"
 git push origin "v$VERSION"
