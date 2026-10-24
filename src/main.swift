@@ -1084,18 +1084,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     /// Проверяет, доступен ли SoundCloud каждые 30 секунд.
     /// Если VPN включён — перезапускает его при потере сети.
     private func startVPNHealthCheck() {
-        vpnHealthTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            // Пытаемся загрузить страницу в фоновом режиме, не показывая UI
-            let task = URLSession.shared.dataTask(with: URLRequest(url: AppConfig.homeURL, timeoutInterval: 5)) { data, response, error in
-                let reachable = error == nil
-                    && (response as? HTTPURLResponse)?.statusCode == 200
-                    && (data?.count ?? 0) > 0
+        vpnHealthTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            let task = URLSession.shared.dataTask(with: URLRequest(url: AppConfig.homeURL, timeoutInterval: 5)) { _, response, error in
+                let reachable = error == nil && (response as? HTTPURLResponse)?.statusCode == 200
                 DispatchQueue.main.async {
                     if !reachable && XrayManager.shared.isRunning {
-                        // Прокси мог зависнуть — перезапускаем его тихо
-                        NSLog("DieCloude: health check failed, restarting VPN proxy")
-                        self.vpnController?.toggleConnection()
+                        NSLog("DieCloude: health check failed, stopping VPN proxy")
+                        XrayManager.shared.stop()
                     }
                 }
             }
