@@ -25,7 +25,7 @@ enum AdBlockService {
             encodedContentRuleList: encodedRules()
         ) { list, error in
             if let error {
-                NSLog("DieCloude ad-block V8 error: \(error)")
+                NSLog("DieCloude ad-block error: \(error)")
                 completion(nil)
                 return
             }

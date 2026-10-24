@@ -265,6 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private var adBlockRuleList: WKContentRuleList?
     private var vpnController: VPNWindowController?
     private let updateManager = UpdateManager()
+    private var vpnHealthTimer: Timer?
     private let settings = SettingsState()
     private let nowPlaying = NowPlayingController()
     // Автосейв: если движок темы ещё не готов (страница грузится),
@@ -291,6 +292,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         NSApp.activate(ignoringOtherApps: true)
         showWelcomeIfNeeded()
         configureBackgroundServices()
+        startVPNHealthCheck()
     }
 
     /// Мост: системные медиа-команды → клики по кнопкам SoundCloud,
@@ -374,6 +376,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         viewMenu.addItem(withTitle: "Домой", action: #selector(loadHome(_:)), keyEquivalent: "0")
         viewMenu.addItem(.separator())
         viewMenu.addItem(withTitle: "Focus Mode", action: #selector(toggleFocusFromMenu(_:)), keyEquivalent: "")
+        let adBlockItem = NSMenuItem(title: "Режим без рекламы", action: #selector(toggleAdBlockFromMenu(_:)), keyEquivalent: "a")
+        adBlockItem.keyEquivalentModifierMask = [.command, .shift]
+        viewMenu.addItem(adBlockItem)
         viewMenu.addItem(withTitle: "Настройки (⌘,)", action: #selector(toggleInfoPanel(_:)), keyEquivalent: "")
         viewItem.submenu = viewMenu
         mainMenu.addItem(viewItem)
@@ -420,6 +425,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let reload = symbolButton("arrow.clockwise", action: #selector(reloadPage(_:)), tooltip: "Обновить")
         let home = symbolButton("house.fill", action: #selector(loadHome(_:)), tooltip: "Домой")
         let playPause = symbolButton("playpause.fill", action: #selector(playerTogglePlay(_:)), tooltip: "Пауза / Воспроизведение (⌘P)")
+        let adBlock = symbolButton("hand.raised.fill", action: #selector(toggleAdBlockFromMenu(_:)), tooltip: "Режим без рекламы (⌘⇧A)")
         let vpn = symbolButton("lock.shield.fill", action: #selector(openVPN(_:)), tooltip: "VPN — только DieCloude")
         let info = symbolButton("slider.horizontal.3", action: #selector(toggleInfoPanel(_:)), tooltip: "Настройки (⌘,)")
 
@@ -438,11 +444,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         progress.alphaValue = 0.9
         progress.translatesAutoresizingMaskIntoConstraints = false
 
-        let left = NSStackView(views: [backButton, forwardButton, reload, home, playPause])
+        let left = NSStackView(views: [backButton, forwardButton, reload, home, playPause, adBlock])
         left.orientation = .horizontal
         left.spacing = 6
         left.translatesAutoresizingMaskIntoConstraints = false
-        [left, titleLabel, vpn, info, progress].forEach(toolbar.addSubview)
+        [left, titleLabel, adBlock, vpn, info, progress].forEach(toolbar.addSubview)
 
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
@@ -805,6 +811,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         applySetting("focus", value: newValue)
     }
 
+    @objc private func toggleAdBlockFromMenu(_ sender: Any?) {
+        let newValue = !(settings.value(for: "adBlock") ?? false)
+        settings.setValue(newValue, for: "adBlock")
+        settings.syncButton(for: "adBlock")
+        applySetting("adBlock", value: newValue, reload: true)
+    }
+
     @objc private func toggleInfoPanel(_ sender: Any?) {
         panelVisible.toggle()
         sidePanelTrailing.constant = panelVisible ? -18 : 500
@@ -1064,6 +1077,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func applicationWillTerminate(_ notification: Notification) {
         XrayManager.shared.stop()
+        vpnHealthTimer?.invalidate()
+        vpnHealthTimer = nil
+    }
+
+    /// Проверяет, доступен ли SoundCloud каждые 30 секунд.
+    /// Если VPN включён — перезапускает его при потере сети.
+    private func startVPNHealthCheck() {
+        vpnHealthTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            // Пытаемся загрузить страницу в фоновом режиме, не показывая UI
+            let task = URLSession.shared.dataTask(with: URLRequest(url: AppConfig.homeURL, timeoutInterval: 5)) { data, response, error in
+                let reachable = error == nil
+                    && (response as? HTTPURLResponse)?.statusCode == 200
+                    && (data?.count ?? 0) > 0
+                DispatchQueue.main.async {
+                    if !reachable && XrayManager.shared.isRunning {
+                        // Прокси мог зависнуть — перезапускаем его тихо
+                        NSLog("DieCloude: health check failed, restarting VPN proxy")
+                        self.vpnController?.toggleConnection()
+                    }
+                }
+            }
+            task.resume()
+        }
     }
 
     @objc private func openVPN(_ sender: Any?) {
@@ -1117,7 +1154,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         let nsError = error as NSError
-        if nsError.code != NSURLErrorCancelled { showConnectionError(nsError) }
+        guard nsError.code != NSURLErrorCancelled else { return }
+        showConnectionError(nsError)
+        // Автоповтор через 5 секунд, если сеть вернулась
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            guard let self else { return }
+            if self.errorOverlay.isHidden { return }
+            let task = URLSession.shared.dataTask(with: URLRequest(url: AppConfig.homeURL, timeoutInterval: 4)) { _, response, _ in
+                if (response as? HTTPURLResponse)?.statusCode == 200 {
+                    DispatchQueue.main.async { self.retryConnection(nil) }
+                }
+            }
+            task.resume()
+        }
     }
 
     deinit {
