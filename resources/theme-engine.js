@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // DieCloude 4.1.0 — theme engine
+  // DieCloude 4.1.1 — theme engine
   // Тегирование + MutationObserver + один <style>, как раньше.
   // 4.1.0: матовое стекло плеера вернулось на явные селекторы (без :is-трюков),
   // добавлен мост в приложение (Now Playing, диагностика) и цветовые темы.
@@ -12,7 +12,7 @@
 
   const root = document.documentElement;
   const STYLE_ID = 'diecloude-theme-engine';
-  const state = { settings: { ...initial }, observer: null, timer: 0, frame: 0 };
+  const state = { settings: { ...initial }, observer: null, timer: 0, frame: 0, pendingNodes: [] };
 
   const selectors = {
     header: '.header, header[role="banner"]',
@@ -719,19 +719,28 @@
   }
 
   function schedule(nodes) {
-    // Дебаунс 180мс, обрабатываем только добавленные узлы, не весь document
+    // Дебаунс 180мс. Раньше повторные мутации во время таймера отбрасывались —
+    // реклама/аудио, появившиеся в этом окне, могли не обработаться.
+    for (const n of nodes) {
+      if (n instanceof Element) state.pendingNodes.push(n);
+    }
     if (state.timer) return;
     state.timer = setTimeout(() => {
       state.timer = 0;
+      const batch = state.pendingNodes;
+      state.pendingNodes = [];
       try {
-        for (const n of nodes) {
-          if (n instanceof Element) {
-            tag(n);
-            removeAds(n);
-            removePromotedCards(n);
-            skipAudioAds(n);
-            hookAudio(n);
-          }
+        // Если накопилось слишком много узлов — дешевле один проход по document.
+        if (batch.length > 40) {
+          refresh(document);
+          return;
+        }
+        for (const n of batch) {
+          tag(n);
+          removeAds(n);
+          removePromotedCards(n);
+          skipAudioAds(n);
+          hookAudio(n);
         }
       } catch (_) {}
       ensurePlayerBar();
@@ -760,6 +769,8 @@
   state.destroy = () => {
     state.observer?.disconnect();
     if (state.timer) clearTimeout(state.timer);
+    state.timer = 0;
+    state.pendingNodes = [];
     if (state.frame) cancelAnimationFrame(state.frame);
     if (nowPlaying.missingTimer) clearTimeout(nowPlaying.missingTimer);
     nowPlaying.cleanup.forEach(fn => fn());

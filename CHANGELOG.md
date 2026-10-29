@@ -1,5 +1,20 @@
 # История изменений
 
+## 4.1.1 — build 35
+
+### Исправлено
+
+- Кнопка «Режим без рекламы» в тулбаре и пункт меню ⌘⇧A меняли только флаг/JS, но не WKContentRuleList — сетевая блокировка могла оставаться в старом состоянии до перезапуска.
+- Health-check VPN останавливал Xray при недоступности SoundCloud и не сбрасывал proxyConfigurations у WKWebView — страница продолжала ходить в мёртвый локальный порт.
+- MutationObserver theme-engine отбрасывал новые DOM-узлы, пока шёл дебаунс 180 мс — часть рекламы/аудио могла не обработаться.
+
+### Изменено
+
+- Кэш theme-engine.js в памяти приложения; lookUp кэша WKContentRuleList перед compile.
+- Now Playing: weak-прокси для WKScriptMessageHandler, снятие remote commands и bridge при выходе.
+- Остановка Xray: мягкий terminate → interrupt → SIGKILL, чтобы ядро не зависало в фоне.
+- Кнопка adblock в тулбаре подсвечивается, когда режим включён.
+
 ## 4.1.0 — build 34
 
 ### Добавлено

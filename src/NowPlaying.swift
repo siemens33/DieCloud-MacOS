@@ -2,6 +2,16 @@ import AppKit
 import MediaPlayer
 import WebKit
 
+/// WKUserContentController держит handler сильно — без weak-прокси
+/// NowPlayingController не освобождается до конца жизни процесса.
+private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var target: (any WKScriptMessageHandler)?
+    init(target: any WKScriptMessageHandler) { self.target = target }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        target?.userContentController(userContentController, didReceive: message)
+    }
+}
+
 /// Мост «страница → приложение» и системный Now Playing.
 ///
 /// JS-движок темы шлёт состояние плеера через message handler "diecloudeBridge"
@@ -10,6 +20,7 @@ import WebKit
 /// кликами по кнопкам SoundCloud.
 final class NowPlayingController: NSObject, WKScriptMessageHandler {
     enum PlayerAction { case togglePlay, next, previous }
+    static let bridgeName = "diecloudeBridge"
 
     /// Выполняется в главном потоке; устанавливается AppDelegate после сборки окна.
     var performAction: ((PlayerAction) -> Void)?
@@ -21,14 +32,36 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
     private var artworkTask: URLSessionDataTask?
     private var artworkURLString = ""
     private var hasState = false
+    private var bridgeProxy: WeakScriptMessageHandler?
+    private weak var contentController: WKUserContentController?
 
     func register(on contentController: WKUserContentController) {
-        contentController.add(self, name: "diecloudeBridge")
+        // Повторная регистрация того же имени крашит WebKit — снимаем старый.
+        contentController.removeScriptMessageHandler(forName: Self.bridgeName)
+        let proxy = WeakScriptMessageHandler(target: self)
+        bridgeProxy = proxy
+        self.contentController = contentController
+        contentController.add(proxy, name: Self.bridgeName)
+    }
+
+    func unregister() {
+        contentController?.removeScriptMessageHandler(forName: Self.bridgeName)
+        contentController = nil
+        bridgeProxy = nil
+        artworkTask?.cancel()
+        artworkTask = nil
+    }
+
+    deinit {
+        disableRemoteCommands()
+        unregister()
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
-        DispatchQueue.main.async { [weak self] in
+        // Сообщения уже приходят на main в WKWebView; лишний async не нужен,
+        // но оставляем на случай вызова из другого контекста.
+        let work = { [weak self] in
             switch type {
             case "state": self?.handleState(body)
             case "meta": self?.handleMeta(body)
@@ -37,6 +70,7 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
             default: break
             }
         }
+        if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
     }
 
     // MARK: - Состояние из страницы
@@ -92,18 +126,39 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
 
     // MARK: - Команды системы
 
+    private var remoteTargets: [Any] = []
+
     func enableRemoteCommands() {
+        // Не копить обработчики при повторном вызове (перезапуск окна / тесты).
+        disableRemoteCommands()
         let center = MPRemoteCommandCenter.shared()
-        center.playCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success }
-        center.pauseCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success }
-        center.togglePlayPauseCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success }
-        center.nextTrackCommand.addTarget { [weak self] _ in self?.runAction(.next); return .success }
-        center.previousTrackCommand.addTarget { [weak self] _ in self?.runAction(.previous); return .success }
-        center.changePlaybackPositionCommand.addTarget { [weak self] event in
-            guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            self?.performSeek?(event.positionTime)
-            return .success
+        remoteTargets = [
+            center.playCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success },
+            center.pauseCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success },
+            center.togglePlayPauseCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success },
+            center.nextTrackCommand.addTarget { [weak self] _ in self?.runAction(.next); return .success },
+            center.previousTrackCommand.addTarget { [weak self] _ in self?.runAction(.previous); return .success },
+            center.changePlaybackPositionCommand.addTarget { [weak self] event in
+                guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+                self?.performSeek?(event.positionTime)
+                return .success
+            }
+        ]
+    }
+
+    func disableRemoteCommands() {
+        guard !remoteTargets.isEmpty else { return }
+        let center = MPRemoteCommandCenter.shared()
+        // Снимаем только наши обработчики (токены от addTarget).
+        for target in remoteTargets {
+            center.playCommand.removeTarget(target)
+            center.pauseCommand.removeTarget(target)
+            center.togglePlayPauseCommand.removeTarget(target)
+            center.nextTrackCommand.removeTarget(target)
+            center.previousTrackCommand.removeTarget(target)
+            center.changePlaybackPositionCommand.removeTarget(target)
         }
+        remoteTargets.removeAll()
     }
 
     private func runAction(_ action: PlayerAction) {

@@ -5,8 +5,8 @@ import Network
 
 enum AppConfig {
     static let name = "DieCloude"
-    static let version = "4.1.0"
-    static let build = "34"
+    static let version = "4.1.1"
+    static let build = "35"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
@@ -268,6 +268,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private var vpnHealthTimer: Timer?
     private let settings = SettingsState()
     private let nowPlaying = NowPlayingController()
+    /// Кэш исходника theme-engine.js — не читаем файл с диска на каждый evaluate.
+    private lazy var themeEngineSource: String = Self.loadThemeEngineSource()
+    /// Прокси WKWebView сейчас направлен на локальный Xray.
+    private var isAppProxyEnabled = false
+    private var adBlockToolbarButton: NSButton?
     // Автосейв: если движок темы ещё не готов (страница грузится),
     // визуальное применение откладывается до didFinish.
     private var needsSettingsSync = false
@@ -279,6 +284,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private var errorOverlay: NSVisualEffectView!
     private var errorDetail: NSTextField!
     private var playerMissingAnnounced = false
+    private var connectionRetryWorkItem: DispatchWorkItem?
 
     // MARK: - Жизненный цикл
 
@@ -426,6 +432,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let home = symbolButton("house.fill", action: #selector(loadHome(_:)), tooltip: "Домой")
         let playPause = symbolButton("playpause.fill", action: #selector(playerTogglePlay(_:)), tooltip: "Пауза / Воспроизведение (⌘P)")
         let adBlock = symbolButton("hand.raised.fill", action: #selector(toggleAdBlockFromMenu(_:)), tooltip: "Режим без рекламы (⌘⇧A)")
+        adBlockToolbarButton = adBlock
+        syncAdBlockToolbarButton()
         let vpn = symbolButton("lock.shield.fill", action: #selector(openVPN(_:)), tooltip: "VPN — только DieCloude")
         let info = symbolButton("slider.horizontal.3", action: #selector(toggleInfoPanel(_:)), tooltip: "Настройки (⌘,)")
 
@@ -710,11 +718,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.adBlockRuleList = list
-                if self.settings.value(for: "adBlock") == true, let list {
-                    self.webView.configuration.userContentController.add(list)
-                }
+                self.applyContentRuleLists(enabled: self.settings.value(for: "adBlock") == true)
             }
         }
+    }
+
+    /// Единая точка для тумблера настроек, меню и кнопки тулбара.
+    private func applyContentRuleLists(enabled: Bool) {
+        let controller = webView.configuration.userContentController
+        controller.removeAllContentRuleLists()
+        if enabled, let adBlockRuleList {
+            controller.add(adBlockRuleList)
+        }
+    }
+
+    private func setAdBlockEnabled(_ enabled: Bool) {
+        settings.setValue(enabled, for: "adBlock")
+        settings.syncButton(for: "adBlock")
+        syncAdBlockToolbarButton()
+        applyContentRuleLists(enabled: enabled)
+        applySetting("adBlock", value: enabled, reload: true)
+    }
+
+    private func syncAdBlockToolbarButton() {
+        guard let button = adBlockToolbarButton else { return }
+        let on = settings.value(for: "adBlock") == true
+        button.contentTintColor = on ? .controlAccentColor : nil
+        button.toolTip = on
+            ? "Режим без рекламы включён (⌘⇧A)"
+            : "Режим без рекламы выключен (⌘⇧A)"
+        button.alphaValue = on ? 1 : 0.6
     }
 
     // MARK: - Мост в theme-engine.js
@@ -767,13 +800,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         }
     }
 
-    private func featureJavaScript() -> String {
-        guard let url = Bundle.main.url(forResource: "theme-engine", withExtension: "js"),
-              let source = try? String(contentsOf: url, encoding: .utf8) else {
-            NSLog("DieCloude: resources/theme-engine.js not found")
-            return "window.__diecloudeThemeEngineError = 'theme-engine.js missing';"
+    private static func loadThemeEngineSource() -> String {
+        if let url = Bundle.main.url(forResource: "theme-engine", withExtension: "js"),
+           let source = try? String(contentsOf: url, encoding: .utf8), !source.isEmpty {
+            return source
         }
-        return source.replacingOccurrences(of: "__SETTINGS__", with: settings.json)
+        NSLog("DieCloude: resources/theme-engine.js not found")
+        return "window.__diecloudeThemeEngineError = 'theme-engine.js missing';"
+    }
+
+    private func featureJavaScript() -> String {
+        themeEngineSource.replacingOccurrences(of: "__SETTINGS__", with: settings.json)
     }
 
     // MARK: - Переключатели настроек
@@ -788,13 +825,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             return
         }
         guard let jsKey = settings.jsKey(of: sender) else { return }
-        settings.setValue(on, for: jsKey)
         if jsKey == "adBlock" {
-            // WKUserContentController хранит только наш V9-лист — пересобираем чисто
-            webView.configuration.userContentController.removeAllContentRuleLists()
-            if on, let adBlockRuleList { webView.configuration.userContentController.add(adBlockRuleList) }
-            applySetting(jsKey, value: on, reload: true)
+            setAdBlockEnabled(on)
         } else {
+            settings.setValue(on, for: jsKey)
             applySetting(jsKey, value: on)
         }
     }
@@ -812,10 +846,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     @objc private func toggleAdBlockFromMenu(_ sender: Any?) {
-        let newValue = !(settings.value(for: "adBlock") ?? false)
-        settings.setValue(newValue, for: "adBlock")
-        settings.syncButton(for: "adBlock")
-        applySetting("adBlock", value: newValue, reload: true)
+        // Раньше меню/тулбар меняли только флаг и JS, но не WKContentRuleList —
+        // сетевая блокировка оставалась в старом состоянии до перезапуска.
+        setAdBlockEnabled(!(settings.value(for: "adBlock") ?? false))
     }
 
     @objc private func toggleInfoPanel(_ sender: Any?) {
@@ -1076,26 +1109,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        XrayManager.shared.stop()
+        connectionRetryWorkItem?.cancel()
         vpnHealthTimer?.invalidate()
         vpnHealthTimer = nil
+        nowPlaying.disableRemoteCommands()
+        nowPlaying.unregister()
+        if isAppProxyEnabled {
+            isAppProxyEnabled = false
+            webView?.configuration.websiteDataStore.proxyConfigurations = []
+        }
+        XrayManager.shared.stop()
     }
 
-    /// Проверяет, доступен ли SoundCloud каждые 30 секунд.
-    /// Если VPN включён — перезапускает его при потере сети.
+    /// Следит, чтобы WebView не оставался с мёртвым локальным прокси:
+    /// если процесс Xray упал, сбрасываем proxyConfigurations и UI VPN.
     private func startVPNHealthCheck() {
-        vpnHealthTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
-            let task = URLSession.shared.dataTask(with: URLRequest(url: AppConfig.homeURL, timeoutInterval: 5)) { _, response, error in
-                let reachable = error == nil && (response as? HTTPURLResponse)?.statusCode == 200
-                DispatchQueue.main.async {
-                    if !reachable && XrayManager.shared.isRunning {
-                        NSLog("DieCloude: health check failed, stopping VPN proxy")
-                        XrayManager.shared.stop()
-                    }
-                }
-            }
-            task.resume()
+        vpnHealthTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            guard self.isAppProxyEnabled else { return }
+            if XrayManager.shared.isRunning { return }
+            NSLog("DieCloude: Xray process gone, clearing per-app proxy")
+            self.applyPerAppProxy(enabled: false, port: XrayManager.shared.localPort)
+            self.vpnController?.markDisconnected(reason: "VPN отключён — процесс прокси завершился")
         }
+        // Не блокируем run loop при фоне/трекинге.
+        vpnHealthTimer?.tolerance = 5
     }
 
     @objc private func openVPN(_ sender: Any?) {
@@ -1107,10 +1145,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private func applyPerAppProxy(enabled: Bool, port: Int) {
         // Прокси действует только на WKWebView DieCloude, не на всю систему
         let store = webView.configuration.websiteDataStore
-        if enabled {
-            let endpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: UInt16(port))!)
+        if enabled, let nwPort = NWEndpoint.Port(rawValue: UInt16(port)) {
+            let endpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: nwPort)
             store.proxyConfigurations = [ProxyConfiguration(httpCONNECTProxy: endpoint, tlsOptions: nil)]
-        } else { store.proxyConfigurations = [] }
+            isAppProxyEnabled = true
+        } else {
+            store.proxyConfigurations = []
+            isAppProxyEnabled = false
+        }
         webView.reload()
     }
 
@@ -1151,21 +1193,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let nsError = error as NSError
         guard nsError.code != NSURLErrorCancelled else { return }
         showConnectionError(nsError)
-        // Автоповтор через 5 секунд, если сеть вернулась
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-            guard let self else { return }
-            if self.errorOverlay.isHidden { return }
-            let task = URLSession.shared.dataTask(with: URLRequest(url: AppConfig.homeURL, timeoutInterval: 4)) { _, response, _ in
+        // Автоповтор через 5 секунд, если сеть вернулась (отменяем предыдущий pending).
+        connectionRetryWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, !self.errorOverlay.isHidden else { return }
+            let task = URLSession.shared.dataTask(with: URLRequest(url: AppConfig.homeURL, timeoutInterval: 4)) { [weak self] _, response, _ in
                 if (response as? HTTPURLResponse)?.statusCode == 200 {
-                    DispatchQueue.main.async { self.retryConnection(nil) }
+                    DispatchQueue.main.async { self?.retryConnection(nil) }
                 }
             }
             task.resume()
         }
+        connectionRetryWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: work)
     }
 
     deinit {
+        connectionRetryWorkItem?.cancel()
+        vpnHealthTimer?.invalidate()
         observations.removeAll()
+        nowPlaying.disableRemoteCommands()
+        nowPlaying.unregister()
     }
 }
 

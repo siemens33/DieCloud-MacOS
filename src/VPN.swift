@@ -96,8 +96,19 @@ final class XrayManager {
         guard let p = process else { return }
         process = nil
         p.terminate()
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) {
-            if p.isRunning { p.interrupt() }
+        DispatchQueue.global(qos: .utility).async {
+            // Даём процессу шанс завершиться мягко, затем SIGKILL.
+            let deadline = Date().addingTimeInterval(0.8)
+            while p.isRunning, Date() < deadline {
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+            if p.isRunning {
+                p.interrupt()
+                Thread.sleep(forTimeInterval: 0.15)
+            }
+            if p.isRunning {
+                kill(p.processIdentifier, SIGKILL)
+            }
         }
         try? FileManager.default.removeItem(at: configURL)
     }
@@ -560,12 +571,21 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
         table.scrollRowToVisible(row)
     }
 
+    /// Вызывается из AppDelegate, если процесс Xray умер сам —
+    /// синхронизируем кнопку и статус без повторного stop().
+    func markDisconnected(reason: String) {
+        connectButton.title = "Подключить"
+        connectButton.isEnabled = true
+        setStatus(reason)
+    }
+
     private func setStatus(_ text: String) {
         status.stringValue = text
         // Точка статуса: зелёная — соединено, серая — выключено
         statusDot.layer?.backgroundColor = (XrayManager.shared.isRunning
             ? NSColor.systemGreen
             : NSColor.systemGray).withAlphaComponent(0.9).cgColor
+        statusDot.layer?.cornerRadius = 4
     }
     func numberOfRows(in tableView:NSTableView)->Int{servers.count}
     func tableView(_ tableView:NSTableView, viewFor tableColumn:NSTableColumn?, row:Int)->NSView? { let id=tableColumn?.identifier.rawValue ?? ""; let field=NSTextField(labelWithString: id=="Сервер" ? servers[row].name : id=="Протокол" ? servers[row].scheme.uppercased() : (servers[row].pingMS.map{$0>=9999 ? "тайм-аут" : "\($0) ms"} ?? "—")); field.lineBreakMode = .byTruncatingTail; return field }

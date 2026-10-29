@@ -20,16 +20,27 @@ enum AdBlockService {
     }
 
     static func compile(completion: @escaping (WKContentRuleList?) -> Void) {
-        WKContentRuleListStore.default().compileContentRuleList(
-            forIdentifier: ruleListIdentifier,
-            encodedContentRuleList: encodedRules()
-        ) { list, error in
-            if let error {
-                NSLog("DieCloude ad-block error: \(error)")
-                completion(nil)
+        guard let store = WKContentRuleListStore.default() else {
+            completion(nil)
+            return
+        }
+        // Сначала кэш WebKit — compileContentRuleList на каждом запуске греет CPU.
+        store.lookUpContentRuleList(forIdentifier: ruleListIdentifier) { existing, _ in
+            if let existing {
+                completion(existing)
                 return
             }
-            completion(list)
+            store.compileContentRuleList(
+                forIdentifier: ruleListIdentifier,
+                encodedContentRuleList: encodedRules()
+            ) { list, error in
+                if let error {
+                    NSLog("DieCloude ad-block error: \(error)")
+                    completion(nil)
+                    return
+                }
+                completion(list)
+            }
         }
     }
 }
