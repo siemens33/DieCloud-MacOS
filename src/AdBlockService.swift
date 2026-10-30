@@ -5,7 +5,11 @@ import WebKit
 /// 2. Cosmetic CSS + DOM removal: theme-engine.js (selectors.ads)
 /// 3. Audio: пропуск/мут first-party прероллов в JS
 enum AdBlockService {
-    static let ruleListIdentifier = "DieCloudeAdBlockRulesV9"
+    static var ruleListIdentifier: String {
+        let rules = encodedRules()
+        let hash = rules.utf8.reduce(into: UInt64(5381)) { $0 = $0 &* 33 &+ UInt64($1) }
+        return "DieCloudeAdBlock_\(hash)"
+    }
 
     /// Загружает JSON-правила из бандла (Resources/adblock-rules.json),
     /// fallback — минимальный встроенный набор чтобы noAds не молчал.

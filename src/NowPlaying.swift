@@ -126,37 +126,31 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
 
     // MARK: - Команды системы
 
-    private var remoteTargets: [Any] = []
+    private var remoteTargets: [(command: MPRemoteCommand, target: Any)] = []
 
     func enableRemoteCommands() {
         // Не копить обработчики при повторном вызове (перезапуск окна / тесты).
         disableRemoteCommands()
         let center = MPRemoteCommandCenter.shared()
         remoteTargets = [
-            center.playCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success },
-            center.pauseCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success },
-            center.togglePlayPauseCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success },
-            center.nextTrackCommand.addTarget { [weak self] _ in self?.runAction(.next); return .success },
-            center.previousTrackCommand.addTarget { [weak self] _ in self?.runAction(.previous); return .success },
-            center.changePlaybackPositionCommand.addTarget { [weak self] event in
+            (center.playCommand, center.playCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success }),
+            (center.pauseCommand, center.pauseCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success }),
+            (center.togglePlayPauseCommand, center.togglePlayPauseCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success }),
+            (center.nextTrackCommand, center.nextTrackCommand.addTarget { [weak self] _ in self?.runAction(.next); return .success }),
+            (center.previousTrackCommand, center.previousTrackCommand.addTarget { [weak self] _ in self?.runAction(.previous); return .success }),
+            (center.changePlaybackPositionCommand, center.changePlaybackPositionCommand.addTarget { [weak self] event in
                 guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
                 self?.performSeek?(event.positionTime)
                 return .success
-            }
+            })
         ]
     }
 
     func disableRemoteCommands() {
         guard !remoteTargets.isEmpty else { return }
-        let center = MPRemoteCommandCenter.shared()
         // Снимаем только наши обработчики (токены от addTarget).
-        for target in remoteTargets {
-            center.playCommand.removeTarget(target)
-            center.pauseCommand.removeTarget(target)
-            center.togglePlayPauseCommand.removeTarget(target)
-            center.nextTrackCommand.removeTarget(target)
-            center.previousTrackCommand.removeTarget(target)
-            center.changePlaybackPositionCommand.removeTarget(target)
+        for (command, target) in remoteTargets {
+            command.removeTarget(target)
         }
         remoteTargets.removeAll()
     }

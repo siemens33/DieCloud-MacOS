@@ -1,10 +1,10 @@
 (() => {
   'use strict';
 
-  // DieCloude 4.1.1 — theme engine
+  // DieCloude 4.2.0 — theme engine
   // Тегирование + MutationObserver + один <style>, как раньше.
-  // 4.1.0: матовое стекло плеера вернулось на явные селекторы (без :is-трюков),
-  // добавлен мост в приложение (Now Playing, диагностика) и цветовые темы.
+  // 4.2.0: Редизайн клиента и плавающей панели плеера, улучшенные карточки,
+  // устранены визуальные артефакты, плавные переходы и акцентные свечения.
 
   const initial = __SETTINGS__;
   const previous = window.__diecloudeThemeEngine;
@@ -66,28 +66,29 @@
     style.id = STYLE_ID;
     style.textContent = `
       :root {
-        --dc-bg: #090a0d;
-        --dc-surface: #0e0f13;
-        --dc-surface-2: #15161c;
+        --dc-bg: #08090c;
+        --dc-surface: #0e1015;
+        --dc-surface-2: #14161f;
         --dc-text: #f5f5f7;
-        --dc-muted: #9b9da5;
-        --dc-line: rgba(255,255,255,.085);
-        --dc-line-strong: rgba(255,255,255,.16);
-        --dc-radius: 12px;
-        --dc-fast: 140ms cubic-bezier(.2,.7,.2,1);
+        --dc-muted: #8e919d;
+        --dc-line: rgba(255,255,255,.07);
+        --dc-line-strong: rgba(255,255,255,.14);
+        --dc-radius: 14px;
+        --dc-fast: 160ms cubic-bezier(.2,.8,.2,1);
         /* Акцент темы. По умолчанию — белый монохром; темы ниже его переопределяют. */
         --dc-accent: #ffffff;
-        --dc-accent-soft: rgba(255,255,255,.08);
+        --dc-accent-soft: rgba(255,255,255,.09);
         --dc-accent-border: rgba(255,255,255,.32);
+        --dc-glass: rgba(255,255,255,.04);
       }
       html.dc-accent-amber {
         --dc-accent: #e8a33d;
-        --dc-accent-soft: rgba(232,163,61,.12);
+        --dc-accent-soft: rgba(232,163,61,.14);
         --dc-accent-border: rgba(232,163,61,.45);
       }
       html.dc-accent-blue {
         --dc-accent: #4f8cff;
-        --dc-accent-soft: rgba(79,140,255,.14);
+        --dc-accent-soft: rgba(79,140,255,.16);
         --dc-accent-border: rgba(79,140,255,.5);
       }
       /* Системный акцент прилетает из приложения точным hex
@@ -112,19 +113,26 @@
         contain-intrinsic-size: auto 180px;
       }
 
-      html.dc-modern [data-dc-header] {
-        background: var(--dc-surface) !important;
+      /* Верхняя панель SoundCloud — полупрозрачное стекло */
+      html.dc-modern [data-dc-header],
+      html.dc-modern header[role="banner"],
+      html.dc-modern .header {
+        background-color: rgba(12, 14, 18, .88) !important;
+        -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+        backdrop-filter: blur(28px) saturate(180%) !important;
         border-bottom: 1px solid var(--dc-line) !important;
-        box-shadow: none !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,.25) !important;
       }
 
       html.dc-modern .headerSearch__input,
       html.dc-modern input[type="search"],
       html.dc-modern input[type="text"] {
-        background: var(--dc-surface-2) !important;
+        background: rgba(255,255,255,.05) !important;
         border: 1px solid var(--dc-line) !important;
-        border-radius: 11px !important;
+        border-radius: 20px !important;
         color: var(--dc-text) !important;
+        font-size: 13px !important;
+        padding: 6px 14px !important;
         box-shadow: none !important;
         transition: border-color var(--dc-fast), background-color var(--dc-fast) !important;
       }
@@ -132,8 +140,24 @@
       html.dc-modern input[type="search"]:focus,
       html.dc-modern input[type="text"]:focus {
         border-color: var(--dc-accent-border) !important;
-        background: #191a20 !important;
+        background: rgba(255,255,255,.09) !important;
         box-shadow: 0 0 0 3px var(--dc-accent-soft) !important;
+      }
+
+      /* Навигация в шапке */
+      html.dc-modern .header__navMenu a,
+      html.dc-modern .header__link {
+        color: var(--dc-muted) !important;
+        font-weight: 500 !important;
+        transition: color var(--dc-fast) !important;
+      }
+      html.dc-modern .header__navMenu a:hover,
+      html.dc-modern .header__link:hover {
+        color: var(--dc-text) !important;
+      }
+      html.dc-modern .header__navMenu a.selected {
+        color: var(--dc-text) !important;
+        border-bottom: 2px solid var(--dc-accent) !important;
       }
 
       html.dc-modern .sc-text-light,
@@ -145,10 +169,30 @@
       }
 
       /* Мягкая подсветка строк трек-листа при наведении */
+      html.dc-modern .trackList__item,
+      html.dc-modern .trackListItem {
+        border-radius: 8px !important;
+        transition: background-color var(--dc-fast) !important;
+      }
       html.dc-modern .trackList__item:hover,
       html.dc-modern .trackListItem:hover,
       html.dc-modern .trackList__item:focus-within {
-        background-color: rgba(255,255,255,.035) !important;
+        background-color: rgba(255,255,255,.04) !important;
+      }
+
+      /* Карточки с эффектом парения и мягкой тенью */
+      html.dc-modern .sound,
+      html.dc-modern .soundBadge,
+      html.dc-modern .searchItem {
+        border-radius: var(--dc-radius) !important;
+        transition: transform var(--dc-fast), box-shadow var(--dc-fast), background-color var(--dc-fast) !important;
+      }
+      html.dc-modern .sound:hover,
+      html.dc-modern .soundBadge:hover,
+      html.dc-modern .searchItem:hover {
+        background-color: rgba(255,255,255,.03) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 10px 28px rgba(0,0,0,.45) !important;
       }
 
       /* Дозаливка тёмным: всплывающие меню, диалоги, тосты, скроллбары */
@@ -183,6 +227,80 @@
         background-clip: padding-box;
       }
       html.dc-modern ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,.24); }
+
+      /* Refined secondary buttons */
+      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls__play"]) {
+        background: var(--dc-surface-2) !important;
+        border: 1px solid var(--dc-line) !important;
+        color: var(--dc-text) !important;
+        border-radius: 8px !important;
+        transition: all var(--dc-fast) !important;
+      }
+      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls__play"]):hover {
+        background: rgba(255,255,255,.06) !important;
+        border-color: var(--dc-line-strong) !important;
+      }
+
+      /* Tab-style navigation links */
+      html.dc-modern .g-tabs-link,
+      html.dc-modern [class*="profileTab"] {
+        color: var(--dc-muted) !important;
+        border-bottom-color: transparent !important;
+        transition: color var(--dc-fast), border-color var(--dc-fast) !important;
+      }
+      html.dc-modern .g-tabs-link.active,
+      html.dc-modern .g-tabs-link:hover,
+      html.dc-modern [class*="profileTab"].active,
+      html.dc-modern [class*="profileTab"]:hover {
+        color: var(--dc-text) !important;
+        border-bottom-color: var(--dc-accent) !important;
+      }
+
+      /* Highlight currently playing track in lists */
+      html.dc-modern .trackItem.playing,
+      html.dc-modern .trackList__item.playing,
+      html.dc-modern .soundList__item.playing {
+        background: linear-gradient(90deg, var(--dc-accent-soft), transparent 70%) !important;
+        border-left: 2px solid var(--dc-accent) !important;
+      }
+
+      /* User profile hero section */
+      html.dc-modern .profileHeader,
+      html.dc-modern [class*="profileHeader"] {
+        background: linear-gradient(180deg, var(--dc-surface-2), var(--dc-bg)) !important;
+        border-bottom: 1px solid var(--dc-line) !important;
+      }
+
+      /* Stats numbers */
+      html.dc-modern .infoStats__value,
+      html.dc-modern [class*="infoStats"] {
+        color: var(--dc-text) !important;
+      }
+
+      /* Links */
+      html.dc-modern a:not(.sc-button):not([class*="playControls"]) {
+        color: var(--dc-muted) !important;
+        transition: color var(--dc-fast) !important;
+      }
+      html.dc-modern a:not(.sc-button):not([class*="playControls"]):hover {
+        color: var(--dc-text) !important;
+      }
+      html.dc-modern .soundTitle__title,
+      html.dc-modern .trackItem__trackTitle {
+        color: var(--dc-text) !important;
+      }
+
+      /* Waveform in player */
+      html.dc-modern .waveform,
+      html.dc-modern [class*="waveform" i] {
+        opacity: .85;
+        filter: saturate(0) brightness(1.3);
+      }
+      html.dc-modern .waveform:hover,
+      html.dc-modern [class*="waveform" i]:hover {
+        opacity: 1;
+        filter: saturate(.5) brightness(1.4);
+      }
 
       /* ─────────────────────────────────────────────────────────────
          МАТОВЫЙ ПЛЕЕР. Реальная разметка SoundCloud (проверено в
@@ -285,13 +403,15 @@
       html.dc-modern footer .playbackTimeline__progress {
         background-color: var(--dc-accent) !important;
         border-radius: 999px !important;
+        box-shadow: 0 0 10px var(--dc-accent-soft) !important;
       }
       html.dc-modern [data-dc-player] .playbackTimeline__progressHandle,
       html.dc-modern [data-dc-playerbar] .playbackTimeline__progressHandle,
       html.dc-modern footer .playbackTimeline__progressHandle {
         background-color: var(--dc-accent) !important;
-        border-color: var(--dc-accent) !important;
-        box-shadow: none !important;
+        border: 2px solid #0e1015 !important;
+        border-radius: 50% !important;
+        box-shadow: 0 0 8px var(--dc-accent-border) !important;
       }
       /* Ползунок громкости — в ту же гамму */
       html.dc-modern [data-dc-player] .volume__sliderRange,
@@ -305,13 +425,15 @@
       html.dc-modern footer .volume__sliderProgress {
         background-color: var(--dc-accent) !important;
         border-radius: 999px !important;
+        box-shadow: 0 0 8px var(--dc-accent-soft) !important;
       }
       html.dc-modern [data-dc-player] .volume__sliderHandle,
       html.dc-modern [data-dc-playerbar] .volume__sliderHandle,
       html.dc-modern footer .volume__sliderHandle {
         background-color: var(--dc-accent) !important;
-        border-color: var(--dc-accent) !important;
-        box-shadow: none !important;
+        border: 2px solid #0e1015 !important;
+        border-radius: 50% !important;
+        box-shadow: 0 0 6px var(--dc-accent-border) !important;
       }
 
       /* Мягкая тонировка родной кнопки плеера под цвет акцента:
@@ -320,10 +442,16 @@
       html.dc-modern [class*="playControls__play"] {
         background-color: color-mix(in srgb, var(--dc-accent) 26%, #ffffff) !important;
         border: none !important;
-        box-shadow: 0 2px 10px rgba(0,0,0,.28) !important;
+        box-shadow: 0 4px 14px rgba(0,0,0,.35) !important;
+        transition: transform 120ms ease, box-shadow 120ms ease !important;
       }
       html.dc-modern [class*="playControls__play"]:hover {
         background-color: color-mix(in srgb, var(--dc-accent) 38%, #ffffff) !important;
+        transform: scale(1.06) !important;
+        box-shadow: 0 6px 20px rgba(0,0,0,.45) !important;
+      }
+      html.dc-modern [class*="playControls__play"]:active {
+        transform: scale(0.95) !important;
       }
       /* Иконка внутри кнопки остаётся тёмной для контраста */
       html.dc-modern [class*="playControls__play"] svg {
@@ -453,6 +581,22 @@
       html.dc-focus [data-dc-promo] { display: none !important; }
       html.dc-focus .l-fluid-fixed,
       html.dc-focus main { max-width: 1180px !important; margin-inline: auto !important; }
+
+      /* Smooth content loading */
+      html.dc-modern .lazyLoadingList__list > *,
+      html.dc-modern .soundList > .soundList__item {
+        animation: dcFadeIn 280ms ease-out both;
+      }
+      @keyframes dcFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html.dc-modern .lazyLoadingList__list > *,
+        html.dc-modern .soundList > .soundList__item {
+          animation: none !important;
+        }
+      }
     `;
     (document.head || root).appendChild(style);
   }
@@ -744,9 +888,13 @@
         }
       } catch (_) {}
       ensurePlayerBar();
-      applyClasses();
+      if (state.frame) cancelAnimationFrame(state.frame);
+      state.frame = requestAnimationFrame(() => {
+        state.frame = 0;
+        applyClasses();
+      });
       maybePostMeta();
-    }, 180);
+    }, 220);
   }
 
   addStyle();

@@ -5,8 +5,8 @@ import Network
 
 enum AppConfig {
     static let name = "DieCloude"
-    static let version = "4.1.1"
-    static let build = "35"
+    static let version = "4.2.0"
+    static let build = "36"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
@@ -119,13 +119,28 @@ private final class SettingsState {
             applyValue(flags[index].defaultValue, to: flags[index].control)
         }
         setAccent("mono")
+        accentSegmented?.selectedSegment = 0
         accentPopup?.selectItem(at: 0)
     }
 
-    /// Выбор акцента из popup-кнопки (индексы совпадают с accentTitles).
+    /// Выбор акцента
     private static let accentTitles = ["Монохром (белый)", "Янтарный", "Синий", "Как в системе"]
     private static let accentValues = ["mono", "amber", "blue", "system"]
     private(set) weak var accentPopup: NSPopUpButton?
+    private(set) weak var accentSegmented: NSSegmentedControl?
+
+    func makeAccentControl(action: Selector, target: AnyObject) -> NSSegmentedControl {
+        let seg = NSSegmentedControl(labels: ["Белый", "Янтарь", "Синий", "macOS"],
+                                     trackingMode: .selectOne,
+                                     target: target,
+                                     action: action)
+        seg.controlSize = .small
+        seg.segmentStyle = .texturedRounded
+        let index = Self.accentValues.firstIndex(of: accent) ?? 0
+        seg.selectedSegment = index
+        accentSegmented = seg
+        return seg
+    }
 
     func makeAccentPopup(action: Selector, target: AnyObject) -> NSPopUpButton {
         let popup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -255,8 +270,6 @@ private final class ToolbarButton: NSButton {
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
     private var window: NSWindow!
     private var webView: WKWebView!
-    private var backButton: NSButton!
-    private var forwardButton: NSButton!
     private var progress: NSProgressIndicator!
     private var titleLabel: NSTextField!
     private var sidePanel: NSVisualEffectView!
@@ -374,6 +387,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         playerItem.submenu = playerMenu
         mainMenu.addItem(playerItem)
 
+        let editItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Правка")
+        editMenu.addItem(withTitle: "Отменить", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "Повторить", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Вырезать", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Копировать", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Вставить", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Выделить всё", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+
         let viewItem = NSMenuItem()
         let viewMenu = NSMenu(title: "Вид")
         viewMenu.addItem(withTitle: "Назад", action: #selector(goBack(_:)), keyEquivalent: "[")
@@ -423,14 +448,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let toolbar = NSVisualEffectView()
         toolbar.material = .headerView
         toolbar.blendingMode = .withinWindow
+        toolbar.wantsLayer = true
+        toolbar.layer?.masksToBounds = false
         toolbar.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(toolbar)
 
-        backButton = symbolButton("chevron.left", action: #selector(goBack(_:)), tooltip: "Назад")
-        forwardButton = symbolButton("chevron.right", action: #selector(goForward(_:)), tooltip: "Вперёд")
-        let reload = symbolButton("arrow.clockwise", action: #selector(reloadPage(_:)), tooltip: "Обновить")
-        let home = symbolButton("house.fill", action: #selector(loadHome(_:)), tooltip: "Домой")
-        let playPause = symbolButton("playpause.fill", action: #selector(playerTogglePlay(_:)), tooltip: "Пауза / Воспроизведение (⌘P)")
         let adBlock = symbolButton("hand.raised.fill", action: #selector(toggleAdBlockFromMenu(_:)), tooltip: "Режим без рекламы (⌘⇧A)")
         adBlockToolbarButton = adBlock
         syncAdBlockToolbarButton()
@@ -438,7 +460,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let info = symbolButton("slider.horizontal.3", action: #selector(toggleInfoPanel(_:)), tooltip: "Настройки (⌘,)")
 
         titleLabel = NSTextField(labelWithString: AppConfig.name)
-        titleLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
         titleLabel.textColor = .secondaryLabelColor
         titleLabel.alignment = .center
         titleLabel.lineBreakMode = .byTruncatingTail
@@ -452,11 +474,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         progress.alphaValue = 0.9
         progress.translatesAutoresizingMaskIntoConstraints = false
 
-        let left = NSStackView(views: [backButton, forwardButton, reload, home, playPause, adBlock])
-        left.orientation = .horizontal
-        left.spacing = 6
-        left.translatesAutoresizingMaskIntoConstraints = false
-        [left, titleLabel, adBlock, vpn, info, progress].forEach(toolbar.addSubview)
+        let rightButtons = NSStackView(views: [adBlock, vpn, info])
+        rightButtons.orientation = .horizontal
+        rightButtons.spacing = 8
+        rightButtons.translatesAutoresizingMaskIntoConstraints = false
+
+        toolbar.addSubview(titleLabel)
+        toolbar.addSubview(rightButtons)
+        toolbar.addSubview(progress)
+
+        let toolbarSeparator = NSView()
+        toolbarSeparator.wantsLayer = true
+        toolbarSeparator.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.06).cgColor
+        toolbarSeparator.translatesAutoresizingMaskIntoConstraints = false
+        toolbar.addSubview(toolbarSeparator)
 
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
@@ -483,19 +514,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         observeWebView()
 
         NSLayoutConstraint.activate([
-            toolbar.topAnchor.constraint(equalTo: root.topAnchor, constant: 28),
+            toolbar.topAnchor.constraint(equalTo: root.topAnchor),
             toolbar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             toolbar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            toolbar.heightAnchor.constraint(equalToConstant: 52),
-            left.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor, constant: 14),
-            left.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+            toolbar.heightAnchor.constraint(equalToConstant: 44),
             titleLabel.centerXAnchor.constraint(equalTo: toolbar.centerXAnchor),
             titleLabel.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-            titleLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 520),
-            info.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -16),
-            vpn.trailingAnchor.constraint(equalTo: info.leadingAnchor, constant: -6),
-            vpn.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-            info.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+            titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: toolbar.leadingAnchor, constant: 80),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: rightButtons.leadingAnchor, constant: -12),
+            rightButtons.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -16),
+            rightButtons.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
             progress.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
             progress.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
             progress.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor),
@@ -503,7 +531,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             webView.topAnchor.constraint(equalTo: toolbar.bottomAnchor),
             webView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: root.bottomAnchor)
+            webView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            toolbarSeparator.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
+            toolbarSeparator.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
+            toolbarSeparator.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor),
+            toolbarSeparator.heightAnchor.constraint(equalToConstant: 1)
         ])
         window.makeKeyAndOrderFront(nil)
     }
@@ -520,79 +552,150 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         sidePanel.layer?.cornerRadius = 20
         sidePanel.layer?.masksToBounds = true
         sidePanel.layer?.borderWidth = 1
-        sidePanel.layer?.borderColor = NSColor.white.withAlphaComponent(0.07).cgColor
-        sidePanel.layer?.shadowOpacity = 0.3
-        sidePanel.layer?.shadowRadius = 28
-        sidePanel.layer?.shadowOffset = NSSize(width: -8, height: 0)
+        sidePanel.layer?.borderColor = NSColor.white.withAlphaComponent(0.09).cgColor
+        sidePanel.layer?.shadowOpacity = 0.4
+        sidePanel.layer?.shadowRadius = 32
+        sidePanel.layer?.shadowOffset = NSSize(width: -6, height: 0)
         sidePanel.layer?.shadowColor = NSColor.black.cgColor
         sidePanel.alphaValue = 0
         sidePanel.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(sidePanel, positioned: .above, relativeTo: webView)
 
-        // Заголовок панели: иконка + имя + строка статуса движка
+        // Заголовок панели: иконка + имя + бейдж версии + статус движка
         let icon = NSImageView()
         icon.image = NSApp.applicationIconImage
         icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.wantsLayer = true
+        icon.layer?.cornerRadius = 9
+        icon.layer?.masksToBounds = true
         icon.translatesAutoresizingMaskIntoConstraints = false
+
         let name = NSTextField(labelWithString: AppConfig.name)
-        name.font = .systemFont(ofSize: 19, weight: .semibold)
-        engineStatusLabel = NSTextField(labelWithString: "Применяется сразу, без перезагрузки")
-        engineStatusLabel.textColor = .secondaryLabelColor
-        engineStatusLabel.font = .systemFont(ofSize: 11)
-        let headerText = NSStackView(views: [name, engineStatusLabel])
+        name.font = .systemFont(ofSize: 18, weight: .bold)
+
+        let verBadge = NSTextField(labelWithString: "v\(AppConfig.version)")
+        verBadge.font = .systemFont(ofSize: 10, weight: .bold)
+        verBadge.textColor = .secondaryLabelColor
+        verBadge.wantsLayer = true
+        verBadge.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.08).cgColor
+        verBadge.layer?.cornerRadius = 5
+        verBadge.alignment = .center
+
+        let nameRow = NSStackView(views: [name, verBadge])
+        nameRow.orientation = .horizontal
+        nameRow.alignment = .centerY
+        nameRow.spacing = 8
+
+        engineStatusLabel = NSTextField(labelWithString: "● Применяется сразу, без перезагрузки")
+        engineStatusLabel.textColor = .systemGreen
+        engineStatusLabel.font = .systemFont(ofSize: 11, weight: .medium)
+
+        let headerText = NSStackView(views: [nameRow, engineStatusLabel])
         headerText.orientation = .vertical
         headerText.alignment = .leading
         headerText.spacing = 2
+
         let header = NSStackView(views: [icon, headerText])
         header.orientation = .horizontal
         header.alignment = .centerY
         header.spacing = 12
 
-        // Секция «Внешний вид»: строки с тумблерами + акцент + сброс
+        // Секция «Внешний вид»
         let toggleAction = #selector(toggleFlag(_:))
-        let designRows: [NSView] = ["modernDesign", "theme", "roundedCards", "artworkHover", "compactMode"].compactMap {
-            guard let sw = settings.makeSwitch(for: $0, action: toggleAction, target: self) else { return nil }
-            return settingsRow(title: settings.title(for: $0), subtitle: settings.subtitle(for: $0), control: sw)
+        let designSpecs: [(key: String, symbol: String, color: NSColor)] = [
+            ("modernDesign", "sparkles", .systemBlue),
+            ("theme", "checkmark.seal.fill", .systemIndigo),
+            ("roundedCards", "square.inset.filled", .systemPink),
+            ("artworkHover", "cursorarrow.rays", .systemTeal),
+            ("compactMode", "arrow.up.and.down.and.arrow.left.and.right", .systemOrange)
+        ]
+        let designRows: [NSView] = designSpecs.compactMap { spec in
+            guard let sw = settings.makeSwitch(for: spec.key, action: toggleAction, target: self) else { return nil }
+            let badge = iconBadge(symbol: spec.symbol, color: spec.color)
+            return modernSettingsRow(icon: badge, title: settings.title(for: spec.key), subtitle: settings.subtitle(for: spec.key), control: sw)
         }
-        let accentPopup = settings.makeAccentPopup(action: #selector(changeAccent(_:)), target: self)
-        accentPopup.widthAnchor.constraint(equalToConstant: 176).isActive = true
-        let accentRow = settingsRow(title: "Цветовой акцент",
-                                    subtitle: "Кнопки, шкала времени и громкость",
-                                    control: accentPopup)
-        let reset = NSButton(title: "Сбросить оформление", target: self, action: #selector(resetDesignSettings(_:)))
-        reset.bezelStyle = .inline
-        reset.controlSize = .small
-        reset.contentTintColor = .secondaryLabelColor
-        let designSection = section(header: "Внешний вид", rows: designRows + [accentRow], footer: reset)
+        let designCard = makeCard(rows: designRows)
+
+        // Секция «Цветовой акцент»
+        let accentCtrl = settings.makeAccentControl(action: #selector(changeAccent(_:)), target: self)
+        let accentBadge = iconBadge(symbol: "paintpalette.fill", color: .systemPurple)
+        let accentRow = modernSettingsRow(icon: accentBadge,
+                                         title: "Цветовой акцент",
+                                         subtitle: "Кнопки, шкала времени и громкость",
+                                         control: accentCtrl)
+        let accentCard = makeCard(rows: [accentRow])
 
         // Секция «Прослушивание»
-        let listeningRows: [NSView] = ["focus", "adBlock"].compactMap {
-            guard let sw = settings.makeSwitch(for: $0, action: toggleAction, target: self) else { return nil }
-            return settingsRow(title: settings.title(for: $0), subtitle: settings.subtitle(for: $0), control: sw)
+        let listeningSpecs: [(key: String, symbol: String, color: NSColor)] = [
+            ("focus", "eye.slash.fill", .systemPurple),
+            ("adBlock", "shield.lefthalf.filled", .systemGreen)
+        ]
+        let listeningRows: [NSView] = listeningSpecs.compactMap { spec in
+            guard let sw = settings.makeSwitch(for: spec.key, action: toggleAction, target: self) else { return nil }
+            let badge = iconBadge(symbol: spec.symbol, color: spec.color)
+            return modernSettingsRow(icon: badge, title: settings.title(for: spec.key), subtitle: settings.subtitle(for: spec.key), control: sw)
         }
-        let listeningSection = section(header: "Прослушивание", rows: listeningRows, footer: nil)
+        let listeningCard = makeCard(rows: listeningRows)
 
-        // Секция «О программе»
-        let version = NSTextField(labelWithString: "Версия \(AppConfig.version) (\(AppConfig.build)) · \(AppConfig.author)")
-        version.textColor = .secondaryLabelColor
-        version.font = .systemFont(ofSize: 11)
-        let updateButton = NSButton(title: "Проверить обновления…", target: self, action: #selector(checkForUpdates(_:)))
-        updateButton.bezelStyle = .inline
-        updateButton.controlSize = .small
-        updateButton.contentTintColor = .secondaryLabelColor
-        let aboutSection = section(header: "О программе", rows: [version], footer: updateButton)
+        // Секция «Управление»
+        let vpnBtn = NSButton(title: "Открыть…", target: self, action: #selector(openVPN(_:)))
+        vpnBtn.bezelStyle = .rounded
+        vpnBtn.controlSize = .small
+        let vpnRow = modernSettingsRow(icon: iconBadge(symbol: "lock.shield.fill", color: .systemCyan),
+                                       title: "Встроенный VPN",
+                                       subtitle: "Действует только на DieCloude",
+                                       control: vpnBtn)
 
-        let close = symbolButton("xmark", action: #selector(toggleInfoPanel(_:)), tooltip: "Закрыть")
+        let resetBtn = NSButton(title: "Сбросить", target: self, action: #selector(resetDesignSettings(_:)))
+        resetBtn.bezelStyle = .rounded
+        resetBtn.controlSize = .small
+        let resetRow = modernSettingsRow(icon: iconBadge(symbol: "arrow.counterclockwise", color: .systemYellow),
+                                         title: "Сбросить оформление",
+                                         subtitle: "Вернуть параметры по умолчанию",
+                                         control: resetBtn)
 
-        let stack = NSStackView(views: [header, separator(), designSection, separator(), listeningSection, separator(), aboutSection])
+        let updateBtn = NSButton(title: "Проверить…", target: self, action: #selector(checkForUpdates(_:)))
+        updateBtn.bezelStyle = .rounded
+        updateBtn.controlSize = .small
+        let updateRow = modernSettingsRow(icon: iconBadge(symbol: "arrow.triangle.2.circlepath", color: .systemBlue),
+                                          title: "Обновления",
+                                          subtitle: "Проверить новую версию на GitHub",
+                                          control: updateBtn)
+        let actionsCard = makeCard(rows: [vpnRow, resetRow, updateRow])
+
+        // Футер
+        let footer = NSTextField(labelWithString: "Версия \(AppConfig.version) (\(AppConfig.build)) · \(AppConfig.author)")
+        footer.font = .systemFont(ofSize: 11)
+        footer.textColor = .tertiaryLabelColor
+        footer.alignment = .center
+
+        let close = symbolButton("xmark", action: #selector(toggleInfoPanel(_:)), tooltip: "Закрыть (Esc)")
+
+        let stack = NSStackView(views: [
+            header,
+            sectionTitle("Оформление"),
+            designCard,
+            sectionTitle("Акцент"),
+            accentCard,
+            sectionTitle("Прослушивание"),
+            listeningCard,
+            sectionTitle("Система"),
+            actionsCard,
+            footer
+        ])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 16
-        stack.edgeInsets = NSEdgeInsets(top: 22, left: 22, bottom: 22, right: 22)
+        stack.spacing = 10
+        stack.setCustomSpacing(14, after: header)
+        stack.setCustomSpacing(12, after: designCard)
+        stack.setCustomSpacing(12, after: accentCard)
+        stack.setCustomSpacing(12, after: listeningCard)
+        stack.setCustomSpacing(16, after: actionsCard)
+        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
-        for fullWidth in [header, designSection, listeningSection, aboutSection] as [NSView] {
-            fullWidth.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -44).isActive = true
-            fullWidth.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        for card in [designCard, accentCard, listeningCard, actionsCard, footer] as [NSView] {
+            card.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
         }
 
         let scroll = NSScrollView()
@@ -605,9 +708,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
         sidePanelTrailing = sidePanel.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: 500)
         NSLayoutConstraint.activate([
-            sidePanel.topAnchor.constraint(equalTo: root.topAnchor, constant: 94),
-            sidePanel.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -18),
-            sidePanel.widthAnchor.constraint(equalToConstant: 440),
+            sidePanel.topAnchor.constraint(equalTo: root.topAnchor, constant: 52),
+            sidePanel.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16),
+            sidePanel.widthAnchor.constraint(equalToConstant: 420),
             sidePanelTrailing,
             scroll.topAnchor.constraint(equalTo: sidePanel.topAnchor),
             scroll.leadingAnchor.constraint(equalTo: sidePanel.leadingAnchor),
@@ -617,50 +720,94 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             stack.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
             stack.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
             stack.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 44),
-            icon.heightAnchor.constraint(equalToConstant: 44),
+            icon.widthAnchor.constraint(equalToConstant: 40),
+            icon.heightAnchor.constraint(equalToConstant: 40),
             close.topAnchor.constraint(equalTo: sidePanel.topAnchor, constant: 14),
             close.trailingAnchor.constraint(equalTo: sidePanel.trailingAnchor, constant: -14)
         ])
     }
 
-    /// Заголовок секции: маленький капс, приглушённый — вместо рамок NSBox.
-    private func section(header title: String, rows: [NSView], footer: NSView?) -> NSView {
-        let label = NSTextField(labelWithString: title.uppercased())
-        label.font = .systemFont(ofSize: 10, weight: .semibold)
-        label.textColor = .tertiaryLabelColor
-        if let attributed = label.attributedStringValue.mutableCopy() as? NSMutableAttributedString {
-            attributed.addAttribute(.kern, value: 1.2, range: NSRange(location: 0, length: attributed.length))
-            label.attributedStringValue = attributed
-        }
-        let stack = NSStackView(views: [label] + rows)
+    private func iconBadge(symbol: String, color: NSColor) -> NSView {
+        let badge = NSView()
+        badge.wantsLayer = true
+        badge.layer?.cornerRadius = 7
+        badge.layer?.masksToBounds = true
+        badge.layer?.backgroundColor = color.withAlphaComponent(0.18).cgColor
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        badge.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        badge.heightAnchor.constraint(equalToConstant: 28).isActive = true
+
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        let img = (NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage()).withSymbolConfiguration(config)
+        let imageView = NSImageView(image: img ?? NSImage())
+        imageView.contentTintColor = color
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        badge.addSubview(imageView)
+        NSLayoutConstraint.activate([
+            imageView.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: badge.centerYAnchor)
+        ])
+        return badge
+    }
+
+    private func makeCard(rows: [NSView]) -> NSView {
+        let card = NSVisualEffectView()
+        card.material = .hudWindow
+        card.appearance = NSAppearance(named: .darkAqua)
+        card.blendingMode = .withinWindow
+        card.wantsLayer = true
+        card.layer?.cornerRadius = 13
+        card.layer?.masksToBounds = true
+        card.layer?.borderWidth = 1
+        card.layer?.borderColor = NSColor.white.withAlphaComponent(0.08).cgColor
+        card.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.025).cgColor
+        card.translatesAutoresizingMaskIntoConstraints = false
+
+        let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 6
-        if let footer {
-            stack.addArrangedSubview(footer)
-            stack.setCustomSpacing(12, after: rows.last ?? label)
-        }
+        stack.spacing = 0
         stack.translatesAutoresizingMaskIntoConstraints = false
-        for row in rows {
+        card.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: card.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor)
+        ])
+
+        for (i, row) in rows.enumerated() {
+            stack.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+            if i < rows.count - 1 {
+                let div = NSView()
+                div.wantsLayer = true
+                div.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.05).cgColor
+                div.translatesAutoresizingMaskIntoConstraints = false
+                stack.addArrangedSubview(div)
+                div.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 50).isActive = true
+                div.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -12).isActive = true
+                div.heightAnchor.constraint(equalToConstant: 1).isActive = true
+            }
         }
-        return stack
+        return card
     }
 
-    private func separator() -> NSView {
-        let line = NSView()
-        line.wantsLayer = true
-        line.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.06).cgColor
-        line.translatesAutoresizingMaskIntoConstraints = false
-        line.heightAnchor.constraint(equalToConstant: 1).isActive = true
-        return line
+    private func sectionTitle(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text.uppercased())
+        label.font = .systemFont(ofSize: 10, weight: .bold)
+        label.textColor = .tertiaryLabelColor
+        if let attributed = label.attributedStringValue.mutableCopy() as? NSMutableAttributedString {
+            attributed.addAttribute(.kern, value: 1.1, range: NSRange(location: 0, length: attributed.length))
+            label.attributedStringValue = attributed
+        }
+        return label
     }
 
-    /// Строка настройки: название + описание слева, элемент управления справа.
-    private func settingsRow(title: String, subtitle: String, control: NSControl) -> NSView {
+    private func modernSettingsRow(icon: NSView, title: String, subtitle: String, control: NSControl) -> NSView {
         let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        titleLabel.font = .systemFont(ofSize: 13, weight: .medium)
         titleLabel.lineBreakMode = .byTruncatingTail
         let subtitleLabel = NSTextField(labelWithString: subtitle)
         subtitleLabel.font = .systemFont(ofSize: 11)
@@ -671,10 +818,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         text.orientation = .vertical
         text.alignment = .leading
         text.spacing = 1
-        let row = NSStackView(views: [text, control])
+        text.translatesAutoresizingMaskIntoConstraints = false
+
+        let row = NSStackView(views: [icon, text, control])
         row.orientation = .horizontal
         row.alignment = .centerY
-        row.spacing = 12
+        row.spacing = 10
+        row.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         row.translatesAutoresizingMaskIntoConstraints = false
         text.setContentHuggingPriority(.defaultLow, for: .horizontal)
         control.setContentHuggingPriority(.required, for: .horizontal)
@@ -683,7 +833,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     private func symbolButton(_ symbol: String, action: Selector, tooltip: String) -> NSButton {
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip) ?? NSImage()
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        let image = (NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip) ?? NSImage()).withSymbolConfiguration(config) ?? NSImage()
         let button = ToolbarButton(image: image, target: self, action: action)
         button.isBordered = false
         button.imagePosition = .imageOnly
@@ -704,9 +855,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 let title = (view.title?.isEmpty == false ? view.title : AppConfig.name) ?? AppConfig.name
                 self?.titleLabel.stringValue = title
                 self?.window.title = title
-            },
-            webView.observe(\.canGoBack, options: [.new]) { [weak self] view, _ in self?.backButton.isEnabled = view.canGoBack },
-            webView.observe(\.canGoForward, options: [.new]) { [weak self] view, _ in self?.forwardButton.isEnabled = view.canGoForward }
+            }
         ]
     }
 
@@ -809,8 +958,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         return "window.__diecloudeThemeEngineError = 'theme-engine.js missing';"
     }
 
+    /// Cached halves of theme-engine.js split at __SETTINGS__ placeholder.
+    private lazy var themeEngineParts: (String, String) = {
+        let parts = themeEngineSource.components(separatedBy: "__SETTINGS__")
+        return (parts.first ?? "", parts.count > 1 ? parts.dropFirst().joined(separator: "__SETTINGS__") : "")
+    }()
+
     private func featureJavaScript() -> String {
-        themeEngineSource.replacingOccurrences(of: "__SETTINGS__", with: settings.json)
+        themeEngineParts.0 + settings.json + themeEngineParts.1
     }
 
     // MARK: - Переключатели настроек
@@ -855,8 +1010,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         panelVisible.toggle()
         sidePanelTrailing.constant = panelVisible ? -18 : 500
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.32
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.duration = 0.38
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.175, 0.885, 0.32, 1.1)
             sidePanel.animator().alphaValue = panelVisible ? 1 : 0
             window.contentView?.layoutSubtreeIfNeeded()
         }
@@ -864,9 +1019,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     // MARK: - Цветовой акцент
 
-    @objc private func changeAccent(_ sender: NSPopUpButton) {
+    @objc private func changeAccent(_ sender: Any) {
         let values = ["mono", "amber", "blue", "system"]
-        let index = sender.indexOfSelectedItem
+        let index: Int
+        if let seg = sender as? NSSegmentedControl {
+            index = seg.selectedSegment
+        } else if let popup = sender as? NSPopUpButton {
+            index = popup.indexOfSelectedItem
+        } else {
+            return
+        }
         guard values.indices.contains(index) else { return }
         settings.setAccent(values[index])
         pushAllSettings()
@@ -1014,6 +1176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     private func hideConnectionError() {
+        connectionRetryWorkItem?.cancel()
+        connectionRetryWorkItem = nil
         guard !errorOverlay.isHidden else { return }
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.2
@@ -1053,13 +1217,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         alert.informativeText = bundledReleaseNotes()
         alert.addButton(withTitle: "Начать слушать")
         alert.addButton(withTitle: "Подробнее")
-        alert.beginSheetModal(for: window) { response in
+        let handleResponse: (NSApplication.ModalResponse) -> Void = { response in
             defaults.set(true, forKey: DefaultsKey.welcome)
             if response == .alertSecondButtonReturn {
                 if let url = URL(string: "https://github.com/siemens33/DieCloud-MacOS/releases/latest") {
                     NSWorkspace.shared.open(url)
                 }
             }
+        }
+        if let window {
+            alert.beginSheetModal(for: window, completionHandler: handleResponse)
+        } else {
+            handleResponse(alert.runModal())
         }
     }
 
@@ -1096,6 +1265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             self?.applyPerAppProxy(enabled: enabled, port: port)
         }
         vpnController = controller
+        controller.window?.appearance = NSAppearance(named: .darkAqua)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak controller] in
             controller?.attemptAutoConnect()
         }
@@ -1124,7 +1294,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     /// Следит, чтобы WebView не оставался с мёртвым локальным прокси:
     /// если процесс Xray упал, сбрасываем proxyConfigurations и UI VPN.
     private func startVPNHealthCheck() {
-        vpnHealthTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+        vpnHealthTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: true) { [weak self] _ in
             guard let self else { return }
             guard self.isAppProxyEnabled else { return }
             if XrayManager.shared.isRunning { return }
@@ -1133,7 +1303,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             self.vpnController?.markDisconnected(reason: "VPN отключён — процесс прокси завершился")
         }
         // Не блокируем run loop при фоне/трекинге.
-        vpnHealthTimer?.tolerance = 5
+        vpnHealthTimer?.tolerance = 2
     }
 
     @objc private func openVPN(_ sender: Any?) {
@@ -1193,13 +1363,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let nsError = error as NSError
         guard nsError.code != NSURLErrorCancelled else { return }
         showConnectionError(nsError)
-        // Автоповтор через 5 секунд, если сеть вернулась (отменяем предыдущий pending).
+        scheduleConnectionRetry()
+    }
+
+    private func scheduleConnectionRetry() {
         connectionRetryWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self, !self.errorOverlay.isHidden else { return }
             let task = URLSession.shared.dataTask(with: URLRequest(url: AppConfig.homeURL, timeoutInterval: 4)) { [weak self] _, response, _ in
                 if (response as? HTTPURLResponse)?.statusCode == 200 {
                     DispatchQueue.main.async { self?.retryConnection(nil) }
+                } else {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                        guard let self, !self.errorOverlay.isHidden else { return }
+                        self.scheduleConnectionRetry()
+                    }
                 }
             }
             task.resume()

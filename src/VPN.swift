@@ -430,10 +430,11 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
         let group = DispatchGroup()
         let semaphore = DispatchSemaphore(value: 6)
         for index in servers.indices {
+            let server = servers[index]
             group.enter()
             DispatchQueue.global(qos: .utility).async {
                 semaphore.wait()
-                self.measure(index: index) {
+                self.measure(server: server, index: index) {
                     semaphore.signal()
                     group.leave()
                 }
@@ -465,11 +466,9 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
         }
     }
 
-    private func measure(index: Int, done: @escaping () -> Void) {
-        guard index < servers.count,
-              let port = NWEndpoint.Port(rawValue: UInt16(servers[index].port)) else { done(); return }
-        let server = servers[index]
-        let queue = DispatchQueue(label: "DieCloude.Ping.\(index)", qos: .utility)
+    private func measure(server: VPNServer, index: Int, done: @escaping () -> Void) {
+        guard let port = NWEndpoint.Port(rawValue: UInt16(server.port)) else { done(); return }
+        let queue = DispatchQueue(label: "DieCloude.Ping.\(server.id.uuidString)", qos: .utility)
         let connection = NWConnection(host: NWEndpoint.Host(server.host), port: port, using: .tcp)
         let start = DispatchTime.now()
         var finished = false
@@ -479,9 +478,11 @@ final class VPNWindowController: NSWindowController, NSTableViewDataSource, NSTa
             finished = true
             connection.cancel()
             DispatchQueue.main.async { [weak self] in
-                guard let self, index < self.servers.count else { done(); return }
-                self.servers[index].pingMS = value
-                self.table.reloadData(forRowIndexes: IndexSet(integer: index), columnIndexes: IndexSet(integersIn: 0..<self.table.numberOfColumns))
+                guard let self else { done(); return }
+                if let idx = self.servers.firstIndex(where: { $0.id == server.id }) {
+                    self.servers[idx].pingMS = value
+                    self.table.reloadData(forRowIndexes: IndexSet(integer: idx), columnIndexes: IndexSet(integersIn: 0..<self.table.numberOfColumns))
+                }
                 done()
             }
         }
