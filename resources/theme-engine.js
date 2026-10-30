@@ -18,7 +18,7 @@
     header: '.header, header[role="banner"]',
     // Планка плеера: тегируем основные узлы, а CSS красит ещё и по подстроке
     // класса — если SoundCloud переименует классы, краска всё равно найдёт бар.
-    player: '.playControls, .playControls__inner, [data-testid="play-controls"]',
+    player: '.playControls, .playControls__inner, .playControls__bg, [data-testid="play-controls"], [class*="playControls" i]',
     playerBar: 'footer, [role="contentinfo"], .player, .player__container',
     artwork: [
       '.sound__coverArt',
@@ -107,8 +107,13 @@
       }
       /* Отступ снизу, чтобы лента треков не перекрывалась фиксированным плеером */
       html.dc-modern .l-container,
-      html.dc-modern .l-content {
-        padding-bottom: 96px !important;
+      html.dc-modern .l-content,
+      html.dc-modern main,
+      html.dc-modern #content,
+      html.dc-modern .stream,
+      html.dc-modern .userMain,
+      html.dc-modern .l-fluid-fixed {
+        padding-bottom: 110px !important;
       }
       /* Гарантированное скрытие вспомогательного текста скринридеров */
       html.dc-modern .sc-visuallyhidden,
@@ -328,44 +333,79 @@
          высота и полное перекрытие контента под плеером.
          ───────────────────────────────────────────────────────────── */
       html.dc-modern .playControls,
-      html.dc-modern .playControls__inner,
+      html.dc-modern [class*="playControls"],
       html.dc-modern [data-dc-player],
       html.dc-modern [data-dc-playerbar],
       html.dc-modern [data-testid="play-controls"],
       html.dc-modern .playControls:hover,
-      html.dc-modern .playControls__inner:hover,
       html.dc-modern [data-dc-player]:hover,
       html.dc-modern [data-dc-playerbar]:hover {
-        background-color: #111318 !important;
-        background: #111318 !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.09) !important;
-        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.7) !important;
-        opacity: 1 !important;
-      }
-      html.dc-modern .playControls {
         position: fixed !important;
         bottom: 0 !important;
         left: 0 !important;
         right: 0 !important;
-        z-index: 1000 !important;
-      }
-      html.dc-modern .playControls__inner {
+        width: 100% !important;
         min-height: 54px !important;
-        max-width: 1280px !important;
+        height: 54px !important;
+        background-color: #111318 !important;
+        background: #111318 !important;
+        background-image: none !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.09) !important;
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.8) !important;
+        opacity: 1 !important;
+        z-index: 10000 !important;
+      }
+
+      /* Подложка и внутренние контейнеры плеера */
+      html.dc-modern .playControls__inner,
+      html.dc-modern .playControls__bg,
+      html.dc-modern .playControls__wrapper {
+        background-color: #111318 !important;
+        background: #111318 !important;
+        background-image: none !important;
+        border-top: none !important;
+        opacity: 1 !important;
+      }
+
+      html.dc-modern .playControls__bg {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: #111318 !important;
+        background: #111318 !important;
+        z-index: 0 !important;
+      }
+
+      html.dc-modern .playControls__wrapper {
+        position: relative !important;
+        z-index: 1 !important;
+        height: 100% !important;
+        max-width: 1320px !important;
         margin: 0 auto !important;
-        display: flex !important;
-        align-items: center !important;
         padding: 0 16px !important;
         box-sizing: border-box !important;
       }
+
+      html.dc-modern .playControls__elements {
+        display: flex !important;
+        align-items: center !important;
+        height: 100% !important;
+        background: transparent !important;
+      }
+
       html.dc-modern .playControls__buttons {
         display: flex !important;
         align-items: center !important;
         gap: 8px !important;
       }
 
-      /* Прозрачные обёртки внутренних элементов (но НЕ сам .playControls__inner!) */
-      html.dc-modern .playControls__elements,
+      /* Прозрачные обёртки внутренних элементов */
       html.dc-modern .playControls__timeline,
       html.dc-modern .playbackSoundBadge,
       html.dc-modern .playbackSoundBadge__titleContextContainer,
@@ -415,12 +455,6 @@
       html.dc-modern .playControls [class*="repeatControl"][aria-checked="true"] {
         color: var(--dc-accent) !important;
         opacity: 1 !important;
-        filter: drop-shadow(0 0 6px var(--dc-accent-soft)) !important;
-      }
-      html.dc-modern .playControls [class*="shuffleControl"][class*="active" i] svg,
-      html.dc-modern .playControls [class*="repeatControl"][class*="active" i] svg {
-        fill: var(--dc-accent) !important;
-      }
         filter: drop-shadow(0 0 6px var(--dc-accent-soft)) !important;
       }
       html.dc-modern .playControls [class*="shuffleControl"][class*="active" i] svg,
@@ -683,8 +717,6 @@
         overflow: hidden !important;
         background-clip: padding-box !important;
         isolation: isolate !important;
-        -webkit-mask-image: -webkit-radial-gradient(white, black) !important;
-        mask-image: radial-gradient(white, black) !important;
       }
       html.dc-rounded [data-dc-artwork] img,
       html.dc-rounded img[data-dc-artwork],

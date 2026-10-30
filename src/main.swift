@@ -503,6 +503,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         nowPlaying.register(on: configuration.userContentController)
 
         webView = WKWebView(frame: .zero, configuration: configuration)
+        if #available(macOS 13.3, *) {
+            webView.isInspectable = true
+        }
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
