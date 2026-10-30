@@ -25,29 +25,34 @@ COMMON=(-O -whole-module-optimization -sdk "$SDK_PATH" -framework AppKit -framew
 lipo -create "$BUILD/DieCloude-arm64" "$BUILD/DieCloude-x86_64" -output "$MACOS/DieCloude"
 rm -f "$BUILD/DieCloude-arm64" "$BUILD/DieCloude-x86_64"
 
-# Официальный Xray-core для локального прокси DieCloude.
+# Официальный Xray-core для локального прокси DieCloude (кэшируется локально).
 XRAY_TAG="v26.3.27"
+CACHE_DIR="$ROOT/.build-cache/xray-$XRAY_TAG"
+mkdir -p "$CACHE_DIR"
+
 for spec in "arm64:Xray-macos-arm64-v8a.zip" "x86_64:Xray-macos-64.zip"; do
   arch="${spec%%:*}"; asset="${spec#*:}"; temp="$BUILD/xray-$arch"
+  cached_zip="$CACHE_DIR/$asset"
   rm -rf "$temp"; mkdir -p "$temp"
-  echo "Загрузка Xray-core $XRAY_TAG ($arch)…"
-  curl -fL --retry 3 "https://github.com/XTLS/Xray-core/releases/download/$XRAY_TAG/$asset" -o "$temp/xray.zip"
-  # Проверка контрольной суммы через .dgst если доступен.
-  # Формат .dgst Xray: MD5= / SHA1= / SHA2-256= / SHA2-512= (нам нужен SHA2-256).
-  if curl -fL --retry 2 "https://github.com/XTLS/Xray-core/releases/download/$XRAY_TAG/$asset.dgst" -o "$temp/xray.zip.dgst" 2>/dev/null; then
-    echo "Проверка sha256 ($arch)…"
-    expected="$(awk -F'= ' '/SHA2-256/{gsub(/[[:space:]]/, "", $2); print $2}' "$temp/xray.zip.dgst" | head -1)"
-    [[ -n "$expected" ]] || expected="$(grep -Eo '[0-9a-fA-F]{64}' "$temp/xray.zip.dgst" | head -1)"
-    actual="$(shasum -a 256 "$temp/xray.zip" | cut -d' ' -f1)"
-    if [[ -z "$expected" ]]; then
-      echo "⚠️  Не смог разобрать SHA2-256 из .dgst, пропускаю проверку ($arch)"
-    elif [[ "$expected" != "$actual" ]]; then
-      echo "❌ sha256 mismatch Xray $arch: expected $expected got $actual"
-      exit 1
+
+  if [[ ! -f "$cached_zip" ]]; then
+    echo "Загрузка Xray-core $XRAY_TAG ($arch)…"
+    curl -fL --retry 3 "https://github.com/XTLS/Xray-core/releases/download/$XRAY_TAG/$asset" -o "$cached_zip"
+    if curl -fL --retry 2 "https://github.com/XTLS/Xray-core/releases/download/$XRAY_TAG/$asset.dgst" -o "$cached_zip.dgst" 2>/dev/null; then
+      echo "Проверка sha256 ($arch)…"
+      expected="$(awk -F'= ' '/SHA2-256/{gsub(/[[:space:]]/, "", $2); print $2}' "$cached_zip.dgst" | head -1)"
+      [[ -n "$expected" ]] || expected="$(grep -Eo '[0-9a-fA-F]{64}' "$cached_zip.dgst" | head -1)"
+      actual="$(shasum -a 256 "$cached_zip" | cut -d' ' -f1)"
+      if [[ -n "$expected" && "$expected" != "$actual" ]]; then
+        echo "❌ sha256 mismatch Xray $arch: expected $expected got $actual"
+        rm -f "$cached_zip"
+        exit 1
+      fi
     fi
   else
-    echo "⚠️  .dgst недоступен, пропускаю проверку sha ($arch)"
+    echo "Использую кэшированный Xray-core $XRAY_TAG ($arch)"
   fi
+  cp "$cached_zip" "$temp/xray.zip"
   ditto -x -k "$temp/xray.zip" "$temp/unpacked"
   xray_path="$(find "$temp/unpacked" -type f -name xray -perm +111 | head -1)"
   [[ -n "$xray_path" ]] || { echo "❌ В архиве Xray не найден исполняемый файл"; exit 1; }

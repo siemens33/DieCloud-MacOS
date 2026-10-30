@@ -21,12 +21,10 @@ echo "DieCloude — замена на последнюю сборку (без с
 echo "=========================================================="
 echo ""
 
-[[ -d "$BUILT_APP" ]] || {
-  echo "❌ Нет собранной программы: $BUILT_APP"
-  echo "Сначала запусти «scripts/Создать установщик.command»."
-  read -k 1 "?Нажми Enter, чтобы закрыть окно." || true
-  exit 1
-}
+if [[ ! -d "$BUILT_APP" ]]; then
+  echo "ℹ️ Сборка не найдена в build/. Запускаю автоматическую сборку…"
+  "$REPO_ROOT/build.sh"
+fi
 
 BUILT_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$BUILT_APP/Contents/Info.plist" 2>/dev/null || echo "?")
 BUILT_BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$BUILT_APP/Contents/Info.plist" 2>/dev/null || echo "?")
@@ -39,9 +37,10 @@ else
 fi
 echo ""
 echo "Приложение будет закрыто и заменено."
-read -k 1 "ANSWER?Продолжить? (y/n) " || true
+read -r "ANSWER?Продолжить? [Y/n] " || true
+ANSWER=${ANSWER:-y}
 echo ""
-[[ "$ANSWER" == [yYдД] ]] || { echo "Отменено."; exit 0; }
+[[ "$ANSWER" == [yYдД]* ]] || { echo "Отменено."; exit 0; }
 
 echo "Закрываю DieCloude…"
 osascript -e 'tell application "DieCloude" to quit' 2>/dev/null || true

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$ROOT/build"
 APP="$BUILD/DieCloude.app"
-VERSION="4.1.0"
+VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Info.plist" 2>/dev/null || echo "4.2.0")"
 DMG="$BUILD/DieCloude-$VERSION.dmg"
 STAGE="$BUILD/dmg-stage"
 

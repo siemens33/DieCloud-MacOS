@@ -98,7 +98,6 @@ version, new_build, notes = sys.argv[1], sys.argv[2], sys.argv[3]
 replacements = [
     (Path('src/main.swift'), r'static let version = "[0-9]+\.[0-9]+\.[0-9]+"', f'static let version = "{version}"'),
     (Path('src/main.swift'), r'static let build = "[0-9]+"', f'static let build = "{new_build}"'),
-    (Path('package-dmg.sh'), r'^VERSION="[0-9]+\.[0-9]+\.[0-9]+"$', f'VERSION="{version}"'),
 ]
 for path, pattern, replacement in replacements:
     text = path.read_text(encoding='utf-8')
@@ -106,6 +105,13 @@ for path, pattern, replacement in replacements:
     if count != 1:
         raise SystemExit(f'Не удалось обновить версию в {path}')
     path.write_text(text, encoding='utf-8')
+
+pkg = Path('package-dmg.sh')
+if pkg.exists():
+    pkg_text = pkg.read_text(encoding='utf-8')
+    pkg_text = re.sub(r'echo "[0-9]+\.[0-9]+\.[0-9]+"', f'echo "{version}"', pkg_text)
+    pkg_text = re.sub(r'^VERSION="[0-9]+\.[0-9]+\.[0-9]+"$', f'VERSION="{version}"', pkg_text, flags=re.M)
+    pkg.write_text(pkg_text, encoding='utf-8')
 
 changelog = Path('CHANGELOG.md')
 old = changelog.read_text(encoding='utf-8') if changelog.exists() else '# История изменений\n'

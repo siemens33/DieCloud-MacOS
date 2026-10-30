@@ -104,7 +104,11 @@
       html.dc-modern main {
         background: var(--dc-bg) !important;
         color: var(--dc-text) !important;
-        padding-bottom: 80px !important;
+      }
+      /* Отступ снизу, чтобы лента треков не перекрывалась фиксированным плеером */
+      html.dc-modern .l-container,
+      html.dc-modern .l-content {
+        padding-bottom: 96px !important;
       }
       /* Гарантированное скрытие вспомогательного текста скринридеров */
       html.dc-modern .sc-visuallyhidden,
@@ -119,23 +123,16 @@
         white-space: nowrap !important;
         border: 0 !important;
       }
-      /* Меньше нагрева: контент не перерисовывается целиком */
-      html.dc-modern .soundList__item,
-      html.dc-modern .trackItem,
-      html.dc-modern .soundBadge {
-        content-visibility: auto;
-        contain-intrinsic-size: auto 180px;
-      }
 
-      /* Верхняя панель SoundCloud — полупрозрачное стекло */
+      /* Верхняя панель SoundCloud — тёмная матовая шапка */
       html.dc-modern [data-dc-header],
       html.dc-modern header[role="banner"],
       html.dc-modern .header {
-        background-color: rgba(12, 14, 18, .88) !important;
-        -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
-        backdrop-filter: blur(28px) saturate(180%) !important;
+        background-color: rgba(14, 16, 21, 0.95) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        backdrop-filter: blur(20px) !important;
         border-bottom: 1px solid var(--dc-line) !important;
-        box-shadow: 0 4px 20px rgba(0,0,0,.25) !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,.3) !important;
       }
 
       html.dc-modern .headerSearch__input,
@@ -242,15 +239,15 @@
       }
       html.dc-modern ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,.24); }
 
-      /* Refined secondary buttons (excluding play buttons) */
-      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls"]):not(.sc-button-play):not(.playButton):not([class*="playButton" i]):not([class*="image__button" i]) {
+      /* Refined secondary buttons (excluding play/pause buttons) */
+      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls"]):not(.sc-button-play):not(.sc-button-pause):not(.playButton):not([class*="playButton" i]):not([class*="image__button" i]) {
         background: var(--dc-surface-2) !important;
         border: 1px solid var(--dc-line) !important;
         color: var(--dc-text) !important;
         border-radius: 8px !important;
         transition: all var(--dc-fast) !important;
       }
-      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls"]):not(.sc-button-play):not(.playButton):not([class*="playButton" i]):not([class*="image__button" i]):hover {
+      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls"]):not(.sc-button-play):not(.sc-button-pause):not(.playButton):not([class*="playButton" i]):not([class*="image__button" i]):hover {
         background: rgba(255,255,255,.06) !important;
         border-color: var(--dc-line-strong) !important;
       }
@@ -325,36 +322,41 @@
          шкалы/громкости (их красим отдельно) и родной белой кнопки
          .playControls__play — её не трогаем вовсе.
          ───────────────────────────────────────────────────────────── */
+      /* ─────────────────────────────────────────────────────────────
+         МАТОВАЯ ПАНЕЛЬ ПЛЕЕРА
+         Плотный глубокий матовый фон (#111318), чистая граница сверху,
+         высота и полное перекрытие контента под плеером.
+         ───────────────────────────────────────────────────────────── */
+      html.dc-modern .playControls,
+      html.dc-modern .playControls__inner,
       html.dc-modern [data-dc-player],
       html.dc-modern [data-dc-playerbar],
-      html.dc-modern .playControls,
       html.dc-modern [data-testid="play-controls"],
-      html.dc-modern [data-dc-player]:hover,
-      html.dc-modern [data-dc-player]:focus-within,
-      html.dc-modern [data-dc-player]:active,
-      html.dc-modern [data-dc-playerbar]:hover,
-      html.dc-modern [data-dc-playerbar]:focus-within,
-      html.dc-modern [data-dc-playerbar]:active,
       html.dc-modern .playControls:hover,
-      html.dc-modern .playControls:focus-within,
-      html.dc-modern .playControls:active,
-      html.dc-modern [data-testid="play-controls"]:hover,
-      html.dc-modern [data-testid="play-controls"]:focus-within,
-      html.dc-modern [data-testid="play-controls"]:active {
-        background-color: rgba(12, 13, 18, 0.96) !important;
-        background-image: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 40%) !important;
-        -webkit-backdrop-filter: blur(50px) saturate(180%) !important;
-        backdrop-filter: blur(50px) saturate(180%) !important;
-        border-top: 1px solid rgba(255,255,255,.14) !important;
-        box-shadow: 0 -8px 32px rgba(0,0,0,.6) !important;
-        isolation: isolate !important;
+      html.dc-modern .playControls__inner:hover,
+      html.dc-modern [data-dc-player]:hover,
+      html.dc-modern [data-dc-playerbar]:hover {
+        background-color: #111318 !important;
+        background: #111318 !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.09) !important;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.7) !important;
+        opacity: 1 !important;
+      }
+      html.dc-modern .playControls {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
         z-index: 1000 !important;
       }
-
-      /* Ограничение ширины и аккуратное центрирование содержимого плеера */
       html.dc-modern .playControls__inner {
+        min-height: 54px !important;
         max-width: 1280px !important;
         margin: 0 auto !important;
+        display: flex !important;
+        align-items: center !important;
+        padding: 0 16px !important;
+        box-sizing: border-box !important;
       }
       html.dc-modern .playControls__buttons {
         display: flex !important;
@@ -362,67 +364,39 @@
         gap: 8px !important;
       }
 
-      /* Внутренности планки — прозрачные, чтобы не перекрывать стекло */
-      html.dc-modern [data-dc-player] > *:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-playerbar] > *:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-player] [class*="playControls__"]:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-playerbar] [class*="playControls__"]:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-player] [class*="playbackSoundBadge"]:not(button),
-      html.dc-modern [data-dc-playerbar] [class*="playbackSoundBadge"]:not(button),
-      html.dc-modern footer div:not([style*="background-image"]),
-      html.dc-modern footer section:not([style*="background-image"]),
-      html.dc-modern [data-dc-player]:hover > *:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-playerbar]:hover > *:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-player]:hover [class*="playControls__"]:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-playerbar]:hover [class*="playControls__"]:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-player]:hover [class*="playbackSoundBadge"]:not(button),
-      html.dc-modern [data-dc-playerbar]:hover [class*="playbackSoundBadge"]:not(button) {
+      /* Прозрачные обёртки внутренних элементов (но НЕ сам .playControls__inner!) */
+      html.dc-modern .playControls__elements,
+      html.dc-modern .playControls__timeline,
+      html.dc-modern .playbackSoundBadge,
+      html.dc-modern .playbackSoundBadge__titleContextContainer,
+      html.dc-modern .playbackSoundBadge__actions {
         background-color: transparent !important;
+        background: transparent !important;
         background-image: none !important;
       }
 
       /* Кнопки управления плеером (skip, shuffle, repeat) */
-      html.dc-modern [data-dc-player] button:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-player] a:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-player] [role="button"]:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-playerbar] button:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-playerbar] a:not([class*="playControls__play"]),
-      html.dc-modern [data-dc-playerbar] [role="button"]:not([class*="playControls__play"]),
       html.dc-modern .playControls__buttons button:not([class*="playControls__play"]),
       html.dc-modern .playControls [class*="skipControl"],
       html.dc-modern .playControls [class*="shuffleControl"],
-      html.dc-modern .playControls [class*="repeatControl"],
-      html.dc-modern footer button,
-      html.dc-modern footer a,
-      html.dc-modern footer [role="button"] {
+      html.dc-modern .playControls [class*="repeatControl"] {
         background-color: transparent !important;
         background-image: none !important;
         box-shadow: none !important;
-        border-color: transparent !important;
+        border: none !important;
         color: rgba(255, 255, 255, 0.72) !important;
         opacity: 0.88 !important;
         cursor: pointer !important;
         transition: color var(--dc-fast), opacity var(--dc-fast), transform var(--dc-fast) !important;
       }
-      html.dc-modern [data-dc-player] button:not([class*="playControls__play"]):hover,
-      html.dc-modern [data-dc-player] a:not([class*="playControls__play"]):hover,
-      html.dc-modern [data-dc-player] [role="button"]:not([class*="playControls__play"]):hover,
-      html.dc-modern [data-dc-playerbar] button:not([class*="playControls__play"]):hover,
-      html.dc-modern [data-dc-playerbar] a:not([class*="playControls__play"]):hover,
-      html.dc-modern [data-dc-playerbar] [role="button"]:not([class*="playControls__play"]):hover,
       html.dc-modern .playControls__buttons button:not([class*="playControls__play"]):hover,
       html.dc-modern .playControls [class*="skipControl"]:hover,
       html.dc-modern .playControls [class*="shuffleControl"]:hover,
-      html.dc-modern .playControls [class*="repeatControl"]:hover,
-      html.dc-modern footer button:hover,
-      html.dc-modern footer a:hover,
-      html.dc-modern footer [role="button"]:hover {
+      html.dc-modern .playControls [class*="repeatControl"]:hover {
         color: #ffffff !important;
         opacity: 1 !important;
         transform: scale(1.1) !important;
       }
-      html.dc-modern [data-dc-player] button:not([class*="playControls__play"]) svg,
-      html.dc-modern [data-dc-playerbar] button:not([class*="playControls__play"]) svg,
       html.dc-modern .playControls__buttons button:not([class*="playControls__play"]) svg,
       html.dc-modern .playControls [class*="skipControl"] svg,
       html.dc-modern .playControls [class*="shuffleControl"] svg,
@@ -441,6 +415,12 @@
       html.dc-modern .playControls [class*="repeatControl"][aria-checked="true"] {
         color: var(--dc-accent) !important;
         opacity: 1 !important;
+        filter: drop-shadow(0 0 6px var(--dc-accent-soft)) !important;
+      }
+      html.dc-modern .playControls [class*="shuffleControl"][class*="active" i] svg,
+      html.dc-modern .playControls [class*="repeatControl"][class*="active" i] svg {
+        fill: var(--dc-accent) !important;
+      }
         filter: drop-shadow(0 0 6px var(--dc-accent-soft)) !important;
       }
       html.dc-modern .playControls [class*="shuffleControl"][class*="active" i] svg,
@@ -611,61 +591,75 @@
         color: var(--dc-accent) !important;
         fill: var(--dc-accent) !important;
       }
-      /* Кнопка воспроизведения на обложках (Play button overlay) — всегда круг */
+      /* Кнопка воспроизведения/паузы на обложках (Play/Pause button overlay) — всегда идеальный круг */
       html.dc-modern .sc-button-play:not([class*="playControls__play"]),
+      html.dc-modern .sc-button-pause:not([class*="playControls__play"]),
       html.dc-modern .playButton,
       html.dc-modern [class*="playButton" i],
       html.dc-modern .image__button,
       html.dc-modern .coverArt__playButton button,
+      html.dc-modern [class*="coverArt"] button,
       html.dc-theme .sc-button-play:not([class*="playControls__play"]),
+      html.dc-theme .sc-button-pause:not([class*="playControls__play"]),
       html.dc-theme .playButton {
         border-radius: 50% !important;
-        background-color: rgba(15, 17, 23, 0.85) !important;
-        -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-        backdrop-filter: blur(20px) saturate(180%) !important;
+        background-color: rgba(15, 17, 23, 0.88) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        backdrop-filter: blur(16px) !important;
         border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
         color: #ffffff !important;
-        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.6) !important;
-        transition: transform 150ms cubic-bezier(.2,.8,.2,1), background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease !important;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55) !important;
+        transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease !important;
       }
       html.dc-modern .sc-button-play:not([class*="playControls__play"]):hover,
+      html.dc-modern .sc-button-pause:not([class*="playControls__play"]):hover,
       html.dc-modern .playButton:hover,
       html.dc-modern [class*="playButton" i]:hover,
       html.dc-modern .image__button:hover,
       html.dc-modern .coverArt__playButton button:hover,
+      html.dc-modern [class*="coverArt"] button:hover,
       html.dc-theme .sc-button-play:not([class*="playControls__play"]):hover,
+      html.dc-theme .sc-button-pause:not([class*="playControls__play"]):hover,
       html.dc-theme .playButton:hover {
         transform: scale(1.08) !important;
         background-color: var(--dc-accent) !important;
         border-color: var(--dc-accent) !important;
         color: #0b0c10 !important;
-        box-shadow: 0 10px 30px var(--dc-accent-soft), 0 4px 16px rgba(0,0,0,0.6) !important;
+        box-shadow: 0 8px 26px var(--dc-accent-soft), 0 4px 16px rgba(0,0,0,0.6) !important;
       }
-      /* Иконка внутри кнопки воспроизведения на обложке */
+      /* Иконка внутри кнопки воспроизведения/паузы на обложке */
       html.dc-modern .sc-button-play:not([class*="playControls__play"]) svg,
+      html.dc-modern .sc-button-pause:not([class*="playControls__play"]) svg,
       html.dc-modern .playButton svg,
       html.dc-modern [class*="playButton" i] svg,
       html.dc-modern .image__button svg,
       html.dc-modern .coverArt__playButton svg,
+      html.dc-modern [class*="coverArt"] button svg,
       html.dc-modern .sc-button-play:not([class*="playControls__play"]) path,
+      html.dc-modern .sc-button-pause:not([class*="playControls__play"]) path,
       html.dc-modern .playButton path,
       html.dc-modern [class*="playButton" i] path,
       html.dc-modern .image__button path,
-      html.dc-modern .coverArt__playButton path {
+      html.dc-modern .coverArt__playButton path,
+      html.dc-modern [class*="coverArt"] button path {
         fill: #ffffff !important;
         color: #ffffff !important;
-        transition: fill 150ms ease !important;
+        transition: fill 140ms ease !important;
       }
       html.dc-modern .sc-button-play:not([class*="playControls__play"]):hover svg,
+      html.dc-modern .sc-button-pause:not([class*="playControls__play"]):hover svg,
       html.dc-modern .playButton:hover svg,
       html.dc-modern [class*="playButton" i]:hover svg,
       html.dc-modern .image__button:hover svg,
       html.dc-modern .coverArt__playButton button:hover svg,
+      html.dc-modern [class*="coverArt"] button:hover svg,
       html.dc-modern .sc-button-play:not([class*="playControls__play"]):hover path,
+      html.dc-modern .sc-button-pause:not([class*="playControls__play"]):hover path,
       html.dc-modern .playButton:hover path,
       html.dc-modern [class*="playButton" i]:hover path,
       html.dc-modern .image__button:hover path,
-      html.dc-modern .coverArt__playButton button:hover path {
+      html.dc-modern .coverArt__playButton button:hover path,
+      html.dc-modern [class*="coverArt"] button:hover path {
         fill: #0b0c10 !important;
         color: #0b0c10 !important;
       }
@@ -698,11 +692,10 @@
       html.dc-rounded .image__full[data-dc-artwork],
       html.dc-rounded [data-dc-artwork] .sc-artwork,
       html.dc-rounded .sc-artwork[data-dc-artwork],
-      html.dc-rounded [data-dc-artwork] [style*="background-image"] {
+      html.dc-rounded [data-dc-artwork] [style*="background-image"],
+      html.dc-rounded [data-dc-artwork] {
         border-radius: 11px !important;
-        background-clip: padding-box !important;
-        -webkit-mask-image: -webkit-radial-gradient(white, black) !important;
-        mask-image: radial-gradient(white, black) !important;
+        overflow: hidden !important;
       }
       html.dc-rounded [data-dc-player] [data-dc-artwork],
       html.dc-rounded [data-dc-player] [data-dc-artwork] img,
@@ -715,21 +708,12 @@
         border-radius: 8px !important;
       }
 
-      /* Lightweight animations: только transform/opacity */
-      @keyframes dcArtworkIn {
-        from { opacity: .001; }
-        to { opacity: 1; }
-      }
-      html.dc-hover [data-dc-artwork] {
-        animation: dcArtworkIn 180ms ease-out both;
-        backface-visibility: hidden;
-      }
+      /* Hover-эффект обложек */
       html.dc-hover [data-dc-card]:hover [data-dc-artwork],
       html.dc-hover [data-dc-artwork]:hover {
-        filter: brightness(1.04) !important;
+        filter: brightness(1.05) !important;
       }
       @media (prefers-reduced-motion: reduce) {
-        html.dc-hover [data-dc-artwork],
         html.dc-modern [data-dc-player] button,
         html.dc-modern [data-dc-playerbar] button,
         html.dc-modern footer button,
@@ -747,7 +731,7 @@
         html.dc-modern [class*="playControls" i] {
           -webkit-backdrop-filter: none !important;
           backdrop-filter: none !important;
-          background: #0e0f13 !important;
+          background: #111318 !important;
         }
       }
 
@@ -764,22 +748,6 @@
       html.dc-focus [data-dc-promo] { display: none !important; }
       html.dc-focus .l-fluid-fixed,
       html.dc-focus main { max-width: 1180px !important; margin-inline: auto !important; }
-
-      /* Smooth content loading */
-      html.dc-modern .lazyLoadingList__list > *,
-      html.dc-modern .soundList > .soundList__item {
-        animation: dcFadeIn 280ms ease-out both;
-      }
-      @keyframes dcFadeIn {
-        from { opacity: 0; transform: translateY(6px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        html.dc-modern .lazyLoadingList__list > *,
-        html.dc-modern .soundList > .soundList__item {
-          animation: none !important;
-        }
-      }
     `;
     (document.head || root).appendChild(style);
   }
@@ -1007,25 +975,7 @@
     try {
       const marked = document.querySelector('[data-dc-playerbar]');
       if (marked && marked.isConnected) return;
-      let el = document.querySelector(selectors.player);
-      if (!el) {
-        const candidates = document.querySelectorAll('audio, button[aria-label], [role="button"][aria-label]');
-        for (const node of candidates) {
-          const label = node.tagName === 'AUDIO' ? '' : (node.getAttribute('aria-label') || '').toLowerCase();
-          if (node.tagName !== 'AUDIO' && !/play|pause|next|previous|воспроизв|пауз|следующ|предыдущ/.test(label)) continue;
-          let p = node.parentElement;
-          for (let i = 0; i < 10 && p && p !== document.body; i++, p = p.parentElement) {
-            let r;
-            try { r = p.getBoundingClientRect(); } catch (_) { continue; }
-            if (r.bottom >= window.innerHeight - 10 && r.width > window.innerWidth * 0.5 &&
-                r.height < window.innerHeight * 0.4 && r.height > 28) {
-              el = p;
-              break;
-            }
-          }
-          if (el) break;
-        }
-      }
+      const el = document.querySelector(selectors.player) || document.querySelector('.playControls, [class*="playControls" i]');
       if (el) {
         el.setAttribute('data-dc-player', '');
         const bar = (el.closest && el.closest(selectors.playerBar)) || el;
