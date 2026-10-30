@@ -11,6 +11,7 @@
   if (previous && typeof previous.destroy === 'function') previous.destroy();
 
   const root = document.documentElement;
+  root.classList.remove('dc-modern');
   const STYLE_ID = 'diecloude-theme-engine';
   const state = { settings: { ...initial }, observer: null, timer: 0, frame: 0, pendingNodes: [] };
 
@@ -887,7 +888,7 @@
 
   function applyClasses() {
     const s = state.settings;
-    root.classList.toggle('dc-modern', Boolean(s.modernDesign));
+    root.classList.toggle('dc-modern', false); // Временно недоступно (сломано, чинится)
     root.classList.toggle('dc-theme', Boolean(s.theme));
     root.classList.toggle('dc-rounded', Boolean(s.roundedCards));
     root.classList.toggle('dc-hover', Boolean(s.artworkHover));

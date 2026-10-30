@@ -6,7 +6,7 @@ import Network
 enum AppConfig {
     static let name = "DieCloude"
     static let version = "4.4.0"
-    static let build = "37"
+    static let build = "38"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
@@ -53,7 +53,7 @@ private final class SettingsState {
     init() {
         let initial: [(key: String, jsKey: String, title: String, tooltip: String, defaultValue: Bool)] = [
             (DefaultsKey.modernDesign, "modernDesign", "Минималистичный интерфейс DieCloude",
-             "Тёмная монохромная тема поверх SoundCloud", true),
+             "Временно недоступно — функция сломана и уже чинится", false),
             (DefaultsKey.theme, "theme", "Белый фирменный акцент",
              "Кнопки и акценты — белый вместо оранжевого", true),
             (DefaultsKey.roundedCards, "roundedCards", "Аккуратное скругление обложек",
@@ -77,6 +77,7 @@ private final class SettingsState {
     /// прикладываем точный hex из macOS — CSS не умеет читать акцент сам.
     var json: String {
         var dict: [String: Any] = Dictionary(uniqueKeysWithValues: flags.map { ($0.jsKey, $0.value) })
+        dict["modernDesign"] = false
         dict["accent"] = accent
         if accent == "system" { dict["accentHex"] = NSColor.controlAccentColor.hexString }
         let data = (try? JSONSerialization.data(withJSONObject: dict)) ?? Data("{}".utf8)
@@ -84,10 +85,12 @@ private final class SettingsState {
     }
 
     func value(for jsKey: String) -> Bool? {
-        flags.first { $0.jsKey == jsKey }?.value
+        if jsKey == "modernDesign" { return false }
+        return flags.first { $0.jsKey == jsKey }?.value
     }
 
     func setValue(_ value: Bool, for jsKey: String) {
+        if jsKey == "modernDesign" { return }
         guard let index = flags.firstIndex(where: { $0.jsKey == jsKey }) else { return }
         flags[index].value = value
         UserDefaults.standard.set(value, forKey: flags[index].key)
@@ -114,9 +117,10 @@ private final class SettingsState {
     /// Сброс дизайн-настроек (не трогает focus и adBlock).
     func resetDesign() {
         for index in flags.indices where flags[index].jsKey != "focus" && flags[index].jsKey != "adBlock" {
-            flags[index].value = flags[index].defaultValue
-            UserDefaults.standard.set(flags[index].defaultValue, forKey: flags[index].key)
-            applyValue(flags[index].defaultValue, to: flags[index].control)
+            let defVal = flags[index].jsKey == "modernDesign" ? false : flags[index].defaultValue
+            flags[index].value = defVal
+            UserDefaults.standard.set(defVal, forKey: flags[index].key)
+            applyValue(defVal, to: flags[index].control)
         }
         setAccent("mono")
         accentSegmented?.selectedSegment = 0
@@ -169,7 +173,13 @@ private final class SettingsState {
         guard let index = flags.firstIndex(where: { $0.jsKey == jsKey }) else { return nil }
         let sw = NSSwitch()
         sw.controlSize = .small
-        sw.state = flags[index].value ? .on : .off
+        if jsKey == "modernDesign" {
+            sw.state = .off
+            sw.isEnabled = false
+            sw.toolTip = "Функция сломана и уже чинится (временно недоступна)"
+        } else {
+            sw.state = flags[index].value ? .on : .off
+        }
         sw.target = target
         sw.action = action
         flags[index].control = sw
@@ -187,9 +197,14 @@ private final class SettingsState {
     private func load() {
         let defaults = UserDefaults.standard
         for index in flags.indices {
-            flags[index].value = defaults.object(forKey: flags[index].key) == nil
-                ? flags[index].defaultValue
-                : defaults.bool(forKey: flags[index].key)
+            if flags[index].jsKey == "modernDesign" {
+                flags[index].value = false
+                defaults.set(false, forKey: flags[index].key)
+            } else {
+                flags[index].value = defaults.object(forKey: flags[index].key) == nil
+                    ? flags[index].defaultValue
+                    : defaults.bool(forKey: flags[index].key)
+            }
         }
     }
 }
@@ -811,10 +826,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private func modernSettingsRow(icon: NSView, title: String, subtitle: String, control: NSControl) -> NSView {
         let titleLabel = NSTextField(labelWithString: title)
         titleLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        titleLabel.textColor = control.isEnabled ? .labelColor : .secondaryLabelColor
         titleLabel.lineBreakMode = .byTruncatingTail
         let subtitleLabel = NSTextField(labelWithString: subtitle)
         subtitleLabel.font = .systemFont(ofSize: 11)
-        subtitleLabel.textColor = .secondaryLabelColor
+        subtitleLabel.textColor = control.isEnabled ? .secondaryLabelColor : .systemOrange
         subtitleLabel.lineBreakMode = .byWordWrapping
         subtitleLabel.maximumNumberOfLines = 2
         let text = NSStackView(views: [titleLabel, subtitleLabel])
@@ -983,6 +999,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             return
         }
         guard let jsKey = settings.jsKey(of: sender) else { return }
+        if jsKey == "modernDesign" {
+            (sender as? NSSwitch)?.state = .off
+            (sender as? NSSwitch)?.isEnabled = false
+            return
+        }
         if jsKey == "adBlock" {
             setAdBlockEnabled(on)
         } else {
