@@ -104,6 +104,20 @@
       html.dc-modern main {
         background: var(--dc-bg) !important;
         color: var(--dc-text) !important;
+        padding-bottom: 80px !important;
+      }
+      /* Гарантированное скрытие вспомогательного текста скринридеров */
+      html.dc-modern .sc-visuallyhidden,
+      html.dc-modern [class*="visuallyhidden" i] {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
       }
       /* Меньше нагрева: контент не перерисовывается целиком */
       html.dc-modern .soundList__item,
@@ -228,15 +242,15 @@
       }
       html.dc-modern ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,.24); }
 
-      /* Refined secondary buttons */
-      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls__play"]) {
+      /* Refined secondary buttons (excluding play buttons) */
+      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls"]):not(.sc-button-play):not(.playButton):not([class*="playButton" i]):not([class*="image__button" i]) {
         background: var(--dc-surface-2) !important;
         border: 1px solid var(--dc-line) !important;
         color: var(--dc-text) !important;
         border-radius: 8px !important;
         transition: all var(--dc-fast) !important;
       }
-      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls__play"]):hover {
+      html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls"]):not(.sc-button-play):not(.playButton):not([class*="playButton" i]):not([class*="image__button" i]):hover {
         background: rgba(255,255,255,.06) !important;
         border-color: var(--dc-line-strong) !important;
       }
@@ -327,20 +341,28 @@
       html.dc-modern [data-testid="play-controls"]:hover,
       html.dc-modern [data-testid="play-controls"]:focus-within,
       html.dc-modern [data-testid="play-controls"]:active {
-        background-color: rgba(15,16,20,.88) !important;
-        background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 46%) !important;
-        -webkit-backdrop-filter: blur(40px) saturate(150%) !important;
-        backdrop-filter: blur(40px) saturate(150%) !important;
-        border-top: 1px solid rgba(255,255,255,.18) !important;
-        box-shadow: 0 -6px 24px rgba(0,0,0,.5) !important;
+        background-color: rgba(12, 13, 18, 0.96) !important;
+        background-image: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0) 40%) !important;
+        -webkit-backdrop-filter: blur(50px) saturate(180%) !important;
+        backdrop-filter: blur(50px) saturate(180%) !important;
+        border-top: 1px solid rgba(255,255,255,.14) !important;
+        box-shadow: 0 -8px 32px rgba(0,0,0,.6) !important;
         isolation: isolate !important;
+        z-index: 1000 !important;
       }
 
-      /* Внутренности планки — прозрачные, чтобы не перекрывать стекло.
-         Обложки с background-image не трогаем — их красит dc-rounded.
-         Родная круглая кнопка .playControls__play исключена: её белый
-         фон и чёрную иконку рисует сам SoundCloud, вмешательство
-         оставляет кривую обводку. */
+      /* Ограничение ширины и аккуратное центрирование содержимого плеера */
+      html.dc-modern .playControls__inner {
+        max-width: 1280px !important;
+        margin: 0 auto !important;
+      }
+      html.dc-modern .playControls__buttons {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+      }
+
+      /* Внутренности планки — прозрачные, чтобы не перекрывать стекло */
       html.dc-modern [data-dc-player] > *:not([class*="playControls__play"]),
       html.dc-modern [data-dc-playerbar] > *:not([class*="playControls__play"]),
       html.dc-modern [data-dc-player] [class*="playControls__"]:not([class*="playControls__play"]),
@@ -358,12 +380,18 @@
         background-color: transparent !important;
         background-image: none !important;
       }
+
+      /* Кнопки управления плеером (skip, shuffle, repeat) */
       html.dc-modern [data-dc-player] button:not([class*="playControls__play"]),
       html.dc-modern [data-dc-player] a:not([class*="playControls__play"]),
       html.dc-modern [data-dc-player] [role="button"]:not([class*="playControls__play"]),
       html.dc-modern [data-dc-playerbar] button:not([class*="playControls__play"]),
       html.dc-modern [data-dc-playerbar] a:not([class*="playControls__play"]),
       html.dc-modern [data-dc-playerbar] [role="button"]:not([class*="playControls__play"]),
+      html.dc-modern .playControls__buttons button:not([class*="playControls__play"]),
+      html.dc-modern .playControls [class*="skipControl"],
+      html.dc-modern .playControls [class*="shuffleControl"],
+      html.dc-modern .playControls [class*="repeatControl"],
       html.dc-modern footer button,
       html.dc-modern footer a,
       html.dc-modern footer [role="button"] {
@@ -371,7 +399,10 @@
         background-image: none !important;
         box-shadow: none !important;
         border-color: transparent !important;
-        transition: opacity var(--dc-fast) !important;
+        color: rgba(255, 255, 255, 0.72) !important;
+        opacity: 0.88 !important;
+        cursor: pointer !important;
+        transition: color var(--dc-fast), opacity var(--dc-fast), transform var(--dc-fast) !important;
       }
       html.dc-modern [data-dc-player] button:not([class*="playControls__play"]):hover,
       html.dc-modern [data-dc-player] a:not([class*="playControls__play"]):hover,
@@ -379,21 +410,67 @@
       html.dc-modern [data-dc-playerbar] button:not([class*="playControls__play"]):hover,
       html.dc-modern [data-dc-playerbar] a:not([class*="playControls__play"]):hover,
       html.dc-modern [data-dc-playerbar] [role="button"]:not([class*="playControls__play"]):hover,
+      html.dc-modern .playControls__buttons button:not([class*="playControls__play"]):hover,
+      html.dc-modern .playControls [class*="skipControl"]:hover,
+      html.dc-modern .playControls [class*="shuffleControl"]:hover,
+      html.dc-modern .playControls [class*="repeatControl"]:hover,
       html.dc-modern footer button:hover,
       html.dc-modern footer a:hover,
       html.dc-modern footer [role="button"]:hover {
-        opacity: .82 !important;
+        color: #ffffff !important;
+        opacity: 1 !important;
+        transform: scale(1.1) !important;
+      }
+      html.dc-modern [data-dc-player] button:not([class*="playControls__play"]) svg,
+      html.dc-modern [data-dc-playerbar] button:not([class*="playControls__play"]) svg,
+      html.dc-modern .playControls__buttons button:not([class*="playControls__play"]) svg,
+      html.dc-modern .playControls [class*="skipControl"] svg,
+      html.dc-modern .playControls [class*="shuffleControl"] svg,
+      html.dc-modern .playControls [class*="repeatControl"] svg {
+        fill: currentColor !important;
+        transition: fill var(--dc-fast) !important;
       }
 
-      /* Нативная шкала времени: позицию не трогаем, только цвет.
-         Пройденная часть — акцент темы, остаток — приглушённый.
-         Селекторы с [data-dc-playerbar] нужны, чтобы перебить
-         обобщающую очистку фонов ниже по специфичности. */
+      /* Активные состояния shuffle / repeat (когда включены) */
+      html.dc-modern .playControls [class*="shuffleControl"][class*="active" i],
+      html.dc-modern .playControls [class*="shuffleControl"][class*="shuffling" i],
+      html.dc-modern .playControls [class*="shuffleControl"][aria-checked="true"],
+      html.dc-modern .playControls [class*="repeatControl"][class*="active" i],
+      html.dc-modern .playControls [class*="repeatControl"][class*="one" i],
+      html.dc-modern .playControls [class*="repeatControl"][class*="all" i],
+      html.dc-modern .playControls [class*="repeatControl"][aria-checked="true"] {
+        color: var(--dc-accent) !important;
+        opacity: 1 !important;
+        filter: drop-shadow(0 0 6px var(--dc-accent-soft)) !important;
+      }
+      html.dc-modern .playControls [class*="shuffleControl"][class*="active" i] svg,
+      html.dc-modern .playControls [class*="repeatControl"][class*="active" i] svg {
+        fill: var(--dc-accent) !important;
+      }
+
+      /* Нативная шкала времени: плавная полоска с подсветкой и круглым бегунком */
+      html.dc-modern .playbackTimeline {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+      }
+      html.dc-modern .playbackTimeline__timePassed,
+      html.dc-modern .playbackTimeline__duration {
+        font-size: 11px !important;
+        font-variant-numeric: tabular-nums !important;
+        color: var(--dc-muted) !important;
+        opacity: 0.9 !important;
+      }
       html.dc-modern [data-dc-player] .playbackTimeline__progressBackground,
       html.dc-modern [data-dc-playerbar] .playbackTimeline__progressBackground,
       html.dc-modern footer .playbackTimeline__progressBackground {
-        background-color: rgba(255,255,255,.16) !important;
+        background-color: rgba(255,255,255,.14) !important;
+        height: 4px !important;
         border-radius: 999px !important;
+        transition: height 120ms ease !important;
+      }
+      html.dc-modern .playbackTimeline:hover .playbackTimeline__progressBackground {
+        height: 6px !important;
       }
       html.dc-modern [data-dc-player] .playbackTimeline__progressBar,
       html.dc-modern [data-dc-playerbar] .playbackTimeline__progressBar,
@@ -408,16 +485,24 @@
       html.dc-modern [data-dc-player] .playbackTimeline__progressHandle,
       html.dc-modern [data-dc-playerbar] .playbackTimeline__progressHandle,
       html.dc-modern footer .playbackTimeline__progressHandle {
-        background-color: var(--dc-accent) !important;
+        background-color: #ffffff !important;
         border: 2px solid #0e1015 !important;
         border-radius: 50% !important;
-        box-shadow: 0 0 8px var(--dc-accent-border) !important;
+        box-shadow: 0 0 8px rgba(0,0,0,0.5) !important;
+        opacity: 0;
+        transition: opacity 120ms ease, transform 120ms ease !important;
       }
+      html.dc-modern .playbackTimeline:hover .playbackTimeline__progressHandle {
+        opacity: 1 !important;
+        transform: scale(1.15) !important;
+      }
+
       /* Ползунок громкости — в ту же гамму */
       html.dc-modern [data-dc-player] .volume__sliderRange,
       html.dc-modern [data-dc-playerbar] .volume__sliderRange,
       html.dc-modern footer .volume__sliderRange {
-        background-color: rgba(255,255,255,.16) !important;
+        background-color: rgba(255,255,255,.14) !important;
+        height: 4px !important;
         border-radius: 999px !important;
       }
       html.dc-modern [data-dc-player] .volume__sliderProgress,
@@ -430,32 +515,79 @@
       html.dc-modern [data-dc-player] .volume__sliderHandle,
       html.dc-modern [data-dc-playerbar] .volume__sliderHandle,
       html.dc-modern footer .volume__sliderHandle {
-        background-color: var(--dc-accent) !important;
+        background-color: #ffffff !important;
         border: 2px solid #0e1015 !important;
         border-radius: 50% !important;
-        box-shadow: 0 0 6px var(--dc-accent-border) !important;
+        box-shadow: 0 0 6px rgba(0,0,0,0.5) !important;
+      }
+      html.dc-modern .volume__button {
+        color: var(--dc-muted) !important;
+        transition: color 140ms ease, transform 140ms ease !important;
+      }
+      html.dc-modern .volume__button:hover {
+        color: #ffffff !important;
+        transform: scale(1.08) !important;
       }
 
-      /* Мягкая тонировка родной кнопки плеера под цвет акцента:
-         цвет подмешивается в белый, круг остаётся спокойным.
-         При монохроме (белый акцент) это просто белый. */
+      /* Карточка играющего трека справа */
+      html.dc-modern .playbackSoundBadge {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+      }
+      html.dc-modern .playbackSoundBadge__avatar {
+        border-radius: 8px !important;
+        overflow: hidden !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+      }
+      html.dc-modern .playbackSoundBadge__titleLink,
+      html.dc-modern .playbackSoundBadge__title {
+        color: var(--dc-text) !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        line-height: 1.3 !important;
+      }
+      html.dc-modern .playbackSoundBadge__lightLink,
+      html.dc-modern .playbackSoundBadge__artist {
+        color: var(--dc-muted) !important;
+        font-size: 11px !important;
+        line-height: 1.3 !important;
+      }
+      html.dc-modern .playbackSoundBadge__actions button {
+        color: var(--dc-muted) !important;
+        opacity: 0.72 !important;
+        transition: all 140ms ease !important;
+      }
+      html.dc-modern .playbackSoundBadge__actions button:hover {
+        color: var(--dc-text) !important;
+        opacity: 1 !important;
+        transform: scale(1.1) !important;
+      }
+      html.dc-modern .playbackSoundBadge__actions .sc-button-like[aria-selected="true"],
+      html.dc-modern .playbackSoundBadge__actions .sc-button-like.sc-button-selected {
+        color: #ff3344 !important;
+        opacity: 1 !important;
+      }
+
+      /* Круглая кнопка Play/Pause плеера: яркая, контрастная, плавная реакция */
       html.dc-modern [class*="playControls__play"] {
-        background-color: color-mix(in srgb, var(--dc-accent) 26%, #ffffff) !important;
+        background-color: #ffffff !important;
         border: none !important;
-        box-shadow: 0 4px 14px rgba(0,0,0,.35) !important;
-        transition: transform 120ms ease, box-shadow 120ms ease !important;
+        border-radius: 50% !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.15) !important;
+        transition: transform 120ms cubic-bezier(.2,.8,.2,1), box-shadow 120ms ease, background-color 120ms ease !important;
       }
       html.dc-modern [class*="playControls__play"]:hover {
-        background-color: color-mix(in srgb, var(--dc-accent) 38%, #ffffff) !important;
-        transform: scale(1.06) !important;
-        box-shadow: 0 6px 20px rgba(0,0,0,.45) !important;
+        background-color: var(--dc-accent, #ffffff) !important;
+        transform: scale(1.08) !important;
+        box-shadow: 0 6px 22px rgba(0,0,0,.55), 0 0 16px var(--dc-accent-soft) !important;
       }
       html.dc-modern [class*="playControls__play"]:active {
         transform: scale(0.95) !important;
       }
-      /* Иконка внутри кнопки остаётся тёмной для контраста */
+      /* Иконка внутри кнопки всегда контрастная тёмная */
       html.dc-modern [class*="playControls__play"] svg {
-        fill: color-mix(in srgb, var(--dc-accent) 18%, #111111) !important;
+        fill: #0b0c10 !important;
       }
 
       /* Акцентные кнопки — цвет текущей темы (монохром по умолчанию) */
@@ -479,16 +611,67 @@
         color: var(--dc-accent) !important;
         fill: var(--dc-accent) !important;
       }
+      /* Кнопка воспроизведения на обложках (Play button overlay) — всегда круг */
+      html.dc-modern .sc-button-play:not([class*="playControls__play"]),
+      html.dc-modern .playButton,
+      html.dc-modern [class*="playButton" i],
+      html.dc-modern .image__button,
+      html.dc-modern .coverArt__playButton button,
       html.dc-theme .sc-button-play:not([class*="playControls__play"]),
       html.dc-theme .playButton {
-        background-color: rgba(12,13,17,.55) !important;
-        border: 1px solid var(--dc-accent-border) !important;
-        box-shadow: 0 4px 18px rgba(0,0,0,.35) !important;
+        border-radius: 50% !important;
+        background-color: rgba(15, 17, 23, 0.85) !important;
+        -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+        backdrop-filter: blur(20px) saturate(180%) !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+        color: #ffffff !important;
+        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.6) !important;
+        transition: transform 150ms cubic-bezier(.2,.8,.2,1), background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease !important;
       }
+      html.dc-modern .sc-button-play:not([class*="playControls__play"]):hover,
+      html.dc-modern .playButton:hover,
+      html.dc-modern [class*="playButton" i]:hover,
+      html.dc-modern .image__button:hover,
+      html.dc-modern .coverArt__playButton button:hover,
       html.dc-theme .sc-button-play:not([class*="playControls__play"]):hover,
       html.dc-theme .playButton:hover {
-        background-color: rgba(20,21,27,.7) !important;
+        transform: scale(1.08) !important;
+        background-color: var(--dc-accent) !important;
         border-color: var(--dc-accent) !important;
+        color: #0b0c10 !important;
+        box-shadow: 0 10px 30px var(--dc-accent-soft), 0 4px 16px rgba(0,0,0,0.6) !important;
+      }
+      /* Иконка внутри кнопки воспроизведения на обложке */
+      html.dc-modern .sc-button-play:not([class*="playControls__play"]) svg,
+      html.dc-modern .playButton svg,
+      html.dc-modern [class*="playButton" i] svg,
+      html.dc-modern .image__button svg,
+      html.dc-modern .coverArt__playButton svg,
+      html.dc-modern .sc-button-play:not([class*="playControls__play"]) path,
+      html.dc-modern .playButton path,
+      html.dc-modern [class*="playButton" i] path,
+      html.dc-modern .image__button path,
+      html.dc-modern .coverArt__playButton path {
+        fill: #ffffff !important;
+        color: #ffffff !important;
+        transition: fill 150ms ease !important;
+      }
+      html.dc-modern .sc-button-play:not([class*="playControls__play"]):hover svg,
+      html.dc-modern .playButton:hover svg,
+      html.dc-modern [class*="playButton" i]:hover svg,
+      html.dc-modern .image__button:hover svg,
+      html.dc-modern .coverArt__playButton button:hover svg,
+      html.dc-modern .sc-button-play:not([class*="playControls__play"]):hover path,
+      html.dc-modern .playButton:hover path,
+      html.dc-modern [class*="playButton" i]:hover path,
+      html.dc-modern .image__button:hover path,
+      html.dc-modern .coverArt__playButton button:hover path {
+        fill: #0b0c10 !important;
+        color: #0b0c10 !important;
+      }
+      html.dc-modern .image__buttonWrapper {
+        background: transparent !important;
+        border: none !important;
       }
       /* Лайки не перекрашиваем: красное сердце — часть SoundCloud */
 
