@@ -6,7 +6,7 @@ import Network
 enum AppConfig {
     static let name = "DieCloude"
     static let version = "4.4.0"
-    static let build = "38"
+    static let build = "39"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
@@ -61,7 +61,7 @@ private final class SettingsState {
             (DefaultsKey.artworkHover, "artworkHover", "Мягкий эффект при наведении",
              "Слегка подсвечивает только обложку, не двигая карточку", true),
             (DefaultsKey.compactMode, "compactMode", "Компактная плотность интерфейса",
-             "Уменьшает лишние вертикальные отступы без перестройки сетки SoundCloud", false),
+             "Временно недоступно — функция сломана и уже чинится", false),
             (DefaultsKey.focus, "focus", "Режим фокуса — скрыть рекомендации",
              "Убирает сайдбар, комментарии и промо", false),
             (DefaultsKey.adBlock, "adBlock", "Режим без рекламы",
@@ -78,6 +78,7 @@ private final class SettingsState {
     var json: String {
         var dict: [String: Any] = Dictionary(uniqueKeysWithValues: flags.map { ($0.jsKey, $0.value) })
         dict["modernDesign"] = false
+        dict["compactMode"] = false
         dict["accent"] = accent
         if accent == "system" { dict["accentHex"] = NSColor.controlAccentColor.hexString }
         let data = (try? JSONSerialization.data(withJSONObject: dict)) ?? Data("{}".utf8)
@@ -85,12 +86,12 @@ private final class SettingsState {
     }
 
     func value(for jsKey: String) -> Bool? {
-        if jsKey == "modernDesign" { return false }
+        if jsKey == "modernDesign" || jsKey == "compactMode" { return false }
         return flags.first { $0.jsKey == jsKey }?.value
     }
 
     func setValue(_ value: Bool, for jsKey: String) {
-        if jsKey == "modernDesign" { return }
+        if jsKey == "modernDesign" || jsKey == "compactMode" { return }
         guard let index = flags.firstIndex(where: { $0.jsKey == jsKey }) else { return }
         flags[index].value = value
         UserDefaults.standard.set(value, forKey: flags[index].key)
@@ -117,7 +118,8 @@ private final class SettingsState {
     /// Сброс дизайн-настроек (не трогает focus и adBlock).
     func resetDesign() {
         for index in flags.indices where flags[index].jsKey != "focus" && flags[index].jsKey != "adBlock" {
-            let defVal = flags[index].jsKey == "modernDesign" ? false : flags[index].defaultValue
+            let isBroken = flags[index].jsKey == "modernDesign" || flags[index].jsKey == "compactMode"
+            let defVal = isBroken ? false : flags[index].defaultValue
             flags[index].value = defVal
             UserDefaults.standard.set(defVal, forKey: flags[index].key)
             applyValue(defVal, to: flags[index].control)
@@ -173,7 +175,7 @@ private final class SettingsState {
         guard let index = flags.firstIndex(where: { $0.jsKey == jsKey }) else { return nil }
         let sw = NSSwitch()
         sw.controlSize = .small
-        if jsKey == "modernDesign" {
+        if jsKey == "modernDesign" || jsKey == "compactMode" {
             sw.state = .off
             sw.isEnabled = false
             sw.toolTip = "Функция сломана и уже чинится (временно недоступна)"
@@ -197,7 +199,7 @@ private final class SettingsState {
     private func load() {
         let defaults = UserDefaults.standard
         for index in flags.indices {
-            if flags[index].jsKey == "modernDesign" {
+            if flags[index].jsKey == "modernDesign" || flags[index].jsKey == "compactMode" {
                 flags[index].value = false
                 defaults.set(false, forKey: flags[index].key)
             } else {
@@ -999,7 +1001,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             return
         }
         guard let jsKey = settings.jsKey(of: sender) else { return }
-        if jsKey == "modernDesign" {
+        if jsKey == "modernDesign" || jsKey == "compactMode" {
             (sender as? NSSwitch)?.state = .off
             (sender as? NSSwitch)?.isEnabled = false
             return

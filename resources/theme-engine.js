@@ -11,7 +11,7 @@
   if (previous && typeof previous.destroy === 'function') previous.destroy();
 
   const root = document.documentElement;
-  root.classList.remove('dc-modern');
+  root.classList.remove('dc-modern', 'dc-compact');
   const STYLE_ID = 'diecloude-theme-engine';
   const state = { settings: { ...initial }, observer: null, timer: 0, frame: 0, pendingNodes: [] };
 
@@ -892,7 +892,7 @@
     root.classList.toggle('dc-theme', Boolean(s.theme));
     root.classList.toggle('dc-rounded', Boolean(s.roundedCards));
     root.classList.toggle('dc-hover', Boolean(s.artworkHover));
-    root.classList.toggle('dc-compact', Boolean(s.compactMode));
+    root.classList.toggle('dc-compact', false); // Временно недоступно (сломано, чинится)
     root.classList.toggle('dc-focus', Boolean(s.focus));
     root.classList.toggle('dc-noads', Boolean(s.adBlock));
     applyAccent();
