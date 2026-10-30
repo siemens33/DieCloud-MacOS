@@ -5,8 +5,8 @@ import Network
 
 enum AppConfig {
     static let name = "DieCloude"
-    static let version = "4.2.0"
-    static let build = "36"
+    static let version = "4.4.0"
+    static let build = "37"
     static let author = "by siemens"
     static let homeURL = URL(string: "https://soundcloud.com/")!
     static let minSize = NSSize(width: 900, height: 600)
