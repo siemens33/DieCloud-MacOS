@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$ROOT/build"
 APP="$BUILD/DieCloude.app"
-VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Info.plist" 2>/dev/null || echo "4.2.0")"
+VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Info.plist" 2>/dev/null || echo "4.5.0")"
 DMG="$BUILD/DieCloude-$VERSION.dmg"
 STAGE="$BUILD/dmg-stage"
 
@@ -37,4 +37,4 @@ echo "✅ Установочный образ готов:"
 echo "$DMG"
 echo ""
 echo "Открой DMG и перетащи DieCloude.app в папку «Программы»."
-open -R "$DMG"
+open -R "$DMG" 2>/dev/null || true

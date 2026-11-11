@@ -1,25 +1,61 @@
 (() => {
   'use strict';
 
-  // DieCloude 4.4.0 — theme engine
-  // Тегирование + MutationObserver + один <style>, как раньше.
-  // 4.4.0: Матовая нижняя панель плеера, полная ликвидация лагов скролла,
-  // обновленные скрипты управления, стеклянные кнопки обложек и Sonoma/Sequoia UI.
+  // DieCloude 4.5.0 — theme engine
+  // Тегирование + MutationObserver + один <style> + перехват Audio + громкость + горячие клавиши.
 
   const initial = __SETTINGS__;
   const previous = window.__diecloudeThemeEngine;
   if (previous && typeof previous.destroy === 'function') previous.destroy();
 
   const root = document.documentElement;
-  root.classList.remove('dc-modern', 'dc-compact');
   const STYLE_ID = 'diecloude-theme-engine';
-  const state = { settings: { ...initial }, observer: null, timer: 0, frame: 0, pendingNodes: [] };
+  const VOLUME_KEY = 'dc_saved_volume';
+  const MUTED_KEY = 'dc_saved_muted';
+
+  function readStoredNumber(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw !== null) {
+        const val = parseFloat(raw);
+        if (Number.isFinite(val)) return Math.max(0, Math.min(1, val));
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  function readStoredBool(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw === 'true') return true;
+      if (raw === 'false') return false;
+    } catch (_) {}
+    return fallback;
+  }
+
+  const state = {
+    settings: {
+      ...initial,
+      volume: typeof initial.volume === 'number' ? initial.volume : readStoredNumber(VOLUME_KEY, 0.8),
+      isMuted: typeof initial.isMuted === 'boolean' ? initial.isMuted : readStoredBool(MUTED_KEY, false)
+    },
+    observer: null,
+    timer: 0,
+    frame: 0,
+    pendingNodes: []
+  };
+
+  function persistVolumeLocal(volume, muted) {
+    try {
+      localStorage.setItem(VOLUME_KEY, String(volume));
+      localStorage.setItem(MUTED_KEY, String(Boolean(muted)));
+    } catch (_) {}
+  }
 
   const selectors = {
     header: '.header, header[role="banner"]',
-    // Планка плеера: тегируем основные узлы, а CSS красит ещё и по подстроке
-    // класса — если SoundCloud переименует классы, краска всё равно найдёт бар.
-    player: '.playControls, .playControls__inner, .playControls__bg, [data-testid="play-controls"], [class*="playControls" i]',
+    // ВАЖНО: Никаких [class*="playControls"], чтобы не тегировать дочерние элементы .playControls__*!
+    player: 'section.playControls, div.playControls:not([class*="playControls__"]), .playControls:not(.playControls *), [data-testid="play-controls"]',
     playerBar: 'footer, [role="contentinfo"], .player, .player__container',
     artwork: [
       '.sound__coverArt',
@@ -92,8 +128,6 @@
         --dc-accent-soft: rgba(79,140,255,.16);
         --dc-accent-border: rgba(79,140,255,.5);
       }
-      /* Системный акцент прилетает из приложения точным hex
-         (инлайн-переменная на <html>, см. applyAccent). */
 
       html.dc-modern { color-scheme: dark; background: var(--dc-bg) !important; }
       html.dc-modern body,
@@ -106,15 +140,43 @@
         background: var(--dc-bg) !important;
         color: var(--dc-text) !important;
       }
-      /* Отступ снизу, чтобы лента треков не перекрывалась фиксированным плеером */
-      html.dc-modern .l-container,
-      html.dc-modern .l-content,
-      html.dc-modern main,
+      /* Отступ снизу для страниц SoundCloud (только внутри #content / main, НЕ трогая шапку и плеер!) */
       html.dc-modern #content,
-      html.dc-modern .stream,
+      html.dc-modern main,
+      html.dc-modern #content .l-container,
+      html.dc-modern #content .l-content,
       html.dc-modern .userMain,
-      html.dc-modern .l-fluid-fixed {
-        padding-bottom: 110px !important;
+      html.dc-modern div.collection,
+      html.dc-modern .collection,
+      html.dc-modern .collection__section,
+      html.dc-modern .collection__likesSection,
+      html.dc-modern .collection__userStream,
+      html.dc-modern .lazyLoadingList,
+      html.dc-modern .stream {
+        padding-bottom: 120px !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Физический нескладывающийся распорный элемент (spacer) в конце любого Grid и Flex списка треков */
+      html.dc-modern .lazyLoadingList__list::after,
+      html.dc-modern .badgeList::after,
+      html.dc-modern .soundBadgeList::after,
+      html.dc-modern .stream__list::after,
+      html.dc-modern .searchList::after,
+      html.dc-modern .collection__likesSection::after,
+      html.dc-modern .collection__userStream::after,
+      html.dc-modern .userStream__list::after,
+      html.dc-modern .trackList__list::after {
+        content: "" !important;
+        display: block !important;
+        width: 100% !important;
+        height: 120px !important;
+        min-height: 120px !important;
+        flex: 0 0 100% !important;
+        flex-basis: 100% !important;
+        grid-column: 1 / -1 !important;
+        pointer-events: none !important;
+        background: transparent !important;
       }
       /* Гарантированное скрытие вспомогательного текста скринридеров */
       html.dc-modern .sc-visuallyhidden,
@@ -130,15 +192,257 @@
         border: 0 !important;
       }
 
-      /* Верхняя панель SoundCloud — тёмная матовая шапка */
+      /* Верхняя панель SoundCloud — тёмная матовая шапка строго 46px */
       html.dc-modern [data-dc-header],
       html.dc-modern header[role="banner"],
       html.dc-modern .header {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 46px !important;
+        max-height: 46px !important;
+        overflow: hidden !important;
         background-color: rgba(14, 16, 21, 0.95) !important;
         -webkit-backdrop-filter: blur(20px) !important;
         backdrop-filter: blur(20px) !important;
         border-bottom: 1px solid var(--dc-line) !important;
         box-shadow: 0 4px 16px rgba(0,0,0,.3) !important;
+        z-index: 9999 !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Защита шапки: header__inner не должен растягиваться и свисать черной полосой */
+      html.dc-modern .header__inner,
+      html.dc-modern .header .l-container,
+      html.dc-modern header .l-container,
+      html.dc-modern [data-dc-header] .l-container {
+        height: 46px !important;
+        max-height: 46px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        box-sizing: border-box !important;
+        overflow: visible !important;
+      }
+
+      /* Контейнер страницы: фиксированные 46px сверху под шапку */
+      html.dc-modern .l-container.l-content,
+      html.dc-modern #app > .l-container {
+        padding-top: 46px !important;
+        margin-top: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Внутри #content верхний отступ НЕ задваиваем */
+      html.dc-modern #content {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      /* Навигация библиотеки (Overview, Likes, Playlists...) — ровно под шапкой, без лишних пустот */
+      html.dc-modern .l-nav,
+      html.dc-modern .l-collection > .l-nav {
+        margin-top: 6px !important;
+        margin-bottom: 8px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+      }
+
+      html.dc-modern .collectionNav,
+      html.dc-modern .collection__nav,
+      html.dc-modern .g-tabs {
+        display: block !important;
+        height: auto !important;
+        min-height: 40px !important;
+        margin-top: 0 !important;
+        margin-bottom: 8px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        overflow: visible !important;
+        border-bottom: 1px solid var(--dc-line) !important;
+      }
+
+      html.dc-modern .g-tabs__item,
+      html.dc-modern .collectionNav__item {
+        display: inline-block !important;
+        margin-right: 20px !important;
+        vertical-align: middle !important;
+      }
+
+      html.dc-modern .g-tabs__link,
+      html.dc-modern .g-tabs-link {
+        display: inline-block !important;
+        padding: 6px 2px 10px 2px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        color: var(--dc-muted) !important;
+        text-decoration: none !important;
+        border-bottom: 2px solid transparent !important;
+        transition: color var(--dc-fast), border-color var(--dc-fast) !important;
+      }
+
+      html.dc-modern .g-tabs__link.active,
+      html.dc-modern .g-tabs__link:hover,
+      html.dc-modern .g-tabs-link.active,
+      html.dc-modern .g-tabs-link:hover {
+        color: var(--dc-text) !important;
+        border-bottom-color: var(--dc-accent) !important;
+      }
+
+      /* Панель управления и фильтрации треков в библиотеке (collectionSection__top) */
+      html.dc-modern .collectionSection__top {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        height: auto !important;
+        min-height: 36px !important;
+        margin-top: 4px !important;
+        margin-bottom: 8px !important;
+        padding: 0 4px !important;
+        background: transparent !important;
+        border: none !important;
+        box-sizing: border-box !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+
+      /* Подзаголовок страницы («Hear the tracks you’ve liked:») */
+      html.dc-modern .collectionSection__subHeading {
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        color: var(--dc-muted) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+      }
+
+      html.dc-modern .collectionSection__flexFill {
+        flex: 1 1 auto !important;
+      }
+
+      /* Переключатель вида (Сетка / Список) */
+      html.dc-modern .listDisplayToggle {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+      }
+
+      html.dc-modern .listDisplayToggle__title {
+        font-size: 13px !important;
+        color: var(--dc-muted) !important;
+        margin-right: 6px !important;
+      }
+
+      html.dc-modern .listDisplayToggle__options {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        list-style: none !important;
+      }
+
+      html.dc-modern .listDisplayToggle button,
+      html.dc-modern .listDisplayToggle .sc-button {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--dc-line) !important;
+        border-radius: 8px !important;
+        color: var(--dc-muted) !important;
+        padding: 4px 6px !important;
+        height: 28px !important;
+        width: 28px !important;
+        box-sizing: border-box !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: background-color var(--dc-fast), color var(--dc-fast), border-color var(--dc-fast) !important;
+      }
+
+      html.dc-modern .listDisplayToggle button:hover,
+      html.dc-modern .listDisplayToggle button.sc-button-selected {
+        background: rgba(255, 255, 255, 0.12) !important;
+        color: var(--dc-text) !important;
+        border-color: var(--dc-line-strong) !important;
+      }
+
+      /* Фильтр / Поиск в коллекции */
+      html.dc-modern .collectionSection__filters {
+        display: inline-flex !important;
+        align-items: center !important;
+        margin-left: 12px !important;
+      }
+
+      html.dc-modern .collectionSection__filterText,
+      html.dc-modern .collectionSection__filterText .textfield {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      html.dc-modern .collectionSection__filterText .textfield__inputWrapper {
+        position: relative !important;
+        display: inline-flex !important;
+        align-items: center !important;
+      }
+
+      html.dc-modern .collectionSection__filterText input.textfield__input,
+      html.dc-modern .collectionSection__filterText input[type="text"],
+      html.dc-modern .collectionSection__filterText input[type="search"] {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--dc-line) !important;
+        border-radius: 18px !important;
+        color: var(--dc-text) !important;
+        font-size: 13px !important;
+        padding: 4px 28px 4px 12px !important;
+        height: 30px !important;
+        min-width: 180px !important;
+        box-sizing: border-box !important;
+        transition: border-color var(--dc-fast), background-color var(--dc-fast), box-shadow var(--dc-fast) !important;
+      }
+
+      html.dc-modern .collectionSection__filterText input.textfield__input:focus,
+      html.dc-modern .collectionSection__filterText input[type="text"]:focus,
+      html.dc-modern .collectionSection__filterText input[type="search"]:focus {
+        background: rgba(255, 255, 255, 0.09) !important;
+        border-color: var(--dc-accent-border) !important;
+        box-shadow: 0 0 0 3px var(--dc-accent-soft) !important;
+        color: var(--dc-text) !important;
+        outline: none !important;
+      }
+
+      html.dc-modern .collectionSection__filterText .textfield__clearContainer {
+        position: absolute !important;
+        right: 8px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        cursor: pointer !important;
+        color: var(--dc-muted) !important;
+      }
+
+      html.dc-modern .collectionSection__filterText .textfield__clearContainer:hover {
+        color: var(--dc-text) !important;
+      }
+
+      /* Сброс лишних служебных заголовков и пустот */
+      html.dc-modern .l-collection-top,
+      html.dc-modern .l-top:empty {
+        display: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+      }
+
+      html.dc-modern .collectionSection__list,
+      html.dc-modern .collection .lazyLoadingList,
+      html.dc-modern .collection .badgeList {
+        padding-top: 0 !important;
+        margin-top: 8px !important;
       }
 
       html.dc-modern .headerSearch__input,
@@ -245,7 +549,7 @@
       }
       html.dc-modern ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,.24); }
 
-      /* Refined secondary buttons (excluding play/pause buttons) */
+      /* Вторичные кнопки (не трогаем play/pause и кнопки плеера) */
       html.dc-modern .sc-button:not(.sc-button-cta):not(.sc-button-primary):not([class*="playControls"]):not(.sc-button-play):not(.sc-button-pause):not(.playButton):not([class*="playButton" i]):not([class*="image__button" i]) {
         background: var(--dc-surface-2) !important;
         border: 1px solid var(--dc-line) !important;
@@ -258,13 +562,16 @@
         border-color: var(--dc-line-strong) !important;
       }
 
-      /* Tab-style navigation links */
+      /* Вкладки профиля и навигации */
+      html.dc-modern .g-tabs__link,
       html.dc-modern .g-tabs-link,
       html.dc-modern [class*="profileTab"] {
         color: var(--dc-muted) !important;
         border-bottom-color: transparent !important;
         transition: color var(--dc-fast), border-color var(--dc-fast) !important;
       }
+      html.dc-modern .g-tabs__link.active,
+      html.dc-modern .g-tabs__link:hover,
       html.dc-modern .g-tabs-link.active,
       html.dc-modern .g-tabs-link:hover,
       html.dc-modern [class*="profileTab"].active,
@@ -273,7 +580,7 @@
         border-bottom-color: var(--dc-accent) !important;
       }
 
-      /* Highlight currently playing track in lists */
+      /* Подсветка играющего трека в списках */
       html.dc-modern .trackItem.playing,
       html.dc-modern .trackList__item.playing,
       html.dc-modern .soundList__item.playing {
@@ -281,20 +588,18 @@
         border-left: 2px solid var(--dc-accent) !important;
       }
 
-      /* User profile hero section */
+      /* Шапка профиля */
       html.dc-modern .profileHeader,
       html.dc-modern [class*="profileHeader"] {
         background: linear-gradient(180deg, var(--dc-surface-2), var(--dc-bg)) !important;
         border-bottom: 1px solid var(--dc-line) !important;
       }
 
-      /* Stats numbers */
       html.dc-modern .infoStats__value,
       html.dc-modern [class*="infoStats"] {
         color: var(--dc-text) !important;
       }
 
-      /* Links */
       html.dc-modern a:not(.sc-button):not([class*="playControls"]) {
         color: var(--dc-muted) !important;
         transition: color var(--dc-fast) !important;
@@ -307,7 +612,7 @@
         color: var(--dc-text) !important;
       }
 
-      /* Waveform in player */
+      /* Вейвформа */
       html.dc-modern .waveform,
       html.dc-modern [class*="waveform" i] {
         opacity: .85;
@@ -320,46 +625,52 @@
       }
 
       /* ─────────────────────────────────────────────────────────────
-         МАТОВЫЙ ПЛЕЕР. Реальная разметка SoundCloud (проверено в
-         живом DOM): панель — это div.playControls (position:fixed),
-         внутри section.playControls__inner[role=contentinfo] с плотным
-         серым фоном; <footer> на странице нет. Стекло кладём на сам
-         .playControls (и теги движка), всё внутри — прозрачное, кроме
-         шкалы/громкости (их красим отдельно) и родной белой кнопки
-         .playControls__play — её не трогаем вовсе.
+         МАТОВАЯ ПАНЕЛЬ ПЛЕЕРА (ТОЛЬКО корневой контейнер .playControls)
+         Никаких [class*="playControls"] — дочерние .playControls__*
+         не должны получать position: fixed и width: 100%!
          ───────────────────────────────────────────────────────────── */
-      /* ─────────────────────────────────────────────────────────────
-         МАТОВАЯ ПАНЕЛЬ ПЛЕЕРА
-         Плотный глубокий матовый фон (#111318), чистая граница сверху,
-         высота и полное перекрытие контента под плеером.
-         ───────────────────────────────────────────────────────────── */
-      html.dc-modern .playControls,
-      html.dc-modern [class*="playControls"],
+      html.dc-modern section.playControls,
+      html.dc-modern div.playControls:not([class*="playControls__"]),
+      html.dc-modern .playControls:not(.playControls *),
       html.dc-modern [data-dc-player],
       html.dc-modern [data-dc-playerbar],
       html.dc-modern [data-testid="play-controls"],
-      html.dc-modern .playControls:hover,
+      html.dc-modern section.playControls:hover,
+      html.dc-modern div.playControls:not([class*="playControls__"]):hover,
+      html.dc-modern .playControls:not(.playControls *):hover,
       html.dc-modern [data-dc-player]:hover,
       html.dc-modern [data-dc-playerbar]:hover {
         position: fixed !important;
         bottom: 0 !important;
         left: 0 !important;
         right: 0 !important;
-        width: 100% !important;
-        min-height: 54px !important;
-        height: 54px !important;
+        width: 100vw !important;
+        min-height: 56px !important;
+        height: 56px !important;
         background-color: #111318 !important;
         background: #111318 !important;
         background-image: none !important;
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
         border-top: 1px solid rgba(255, 255, 255, 0.09) !important;
-        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.8) !important;
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.85) !important;
         opacity: 1 !important;
-        z-index: 10000 !important;
+        z-index: 99990 !important;
+        isolation: isolate !important;
       }
 
-      /* Подложка и внутренние контейнеры плеера */
+      /* Дополнительная матовая заглушка под плеером от субпиксельных зазоров внизу окна */
+      html.dc-modern .playControls::after {
+        content: "" !important;
+        position: absolute !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: -15px !important;
+        height: 20px !important;
+        background-color: #111318 !important;
+        background: #111318 !important;
+        z-index: -1 !important;
+        pointer-events: none !important;
+      }
+
       html.dc-modern .playControls__inner,
       html.dc-modern .playControls__bg,
       html.dc-modern .playControls__wrapper {
@@ -370,17 +681,21 @@
         opacity: 1 !important;
       }
 
-      html.dc-modern .playControls__bg {
+      html.dc-modern .playControls > .playControls__bg,
+      html.dc-modern .playControls .playControls__bg {
         position: absolute !important;
+        inset: 0 !important;
         top: 0 !important;
         left: 0 !important;
         right: 0 !important;
-        bottom: 0 !important;
+        bottom: -15px !important;
         width: 100% !important;
-        height: 100% !important;
+        height: calc(100% + 15px) !important;
         background-color: #111318 !important;
         background: #111318 !important;
+        opacity: 1 !important;
         z-index: 0 !important;
+        pointer-events: none !important;
       }
 
       html.dc-modern .playControls__wrapper {
@@ -446,7 +761,7 @@
         transition: fill var(--dc-fast) !important;
       }
 
-      /* Активные состояния shuffle / repeat (когда включены) */
+      /* Активные состояния shuffle / repeat */
       html.dc-modern .playControls [class*="shuffleControl"][class*="active" i],
       html.dc-modern .playControls [class*="shuffleControl"][class*="shuffling" i],
       html.dc-modern .playControls [class*="shuffleControl"][aria-checked="true"],
@@ -463,7 +778,7 @@
         fill: var(--dc-accent) !important;
       }
 
-      /* Нативная шкала времени: плавная полоска с подсветкой и круглым бегунком */
+      /* Нативная шкала времени */
       html.dc-modern .playbackTimeline {
         display: flex !important;
         align-items: center !important;
@@ -512,7 +827,7 @@
         transform: scale(1.15) !important;
       }
 
-      /* Ползунок громкости — в ту же гамму */
+      /* Ползунок громкости */
       html.dc-modern [data-dc-player] .volume__sliderRange,
       html.dc-modern [data-dc-playerbar] .volume__sliderRange,
       html.dc-modern footer .volume__sliderRange {
@@ -584,7 +899,7 @@
         opacity: 1 !important;
       }
 
-      /* Круглая кнопка Play/Pause плеера: яркая, контрастная, плавная реакция */
+      /* Круглая кнопка Play/Pause плеера */
       html.dc-modern [class*="playControls__play"] {
         background-color: #ffffff !important;
         border: none !important;
@@ -600,12 +915,11 @@
       html.dc-modern [class*="playControls__play"]:active {
         transform: scale(0.95) !important;
       }
-      /* Иконка внутри кнопки всегда контрастная тёмная */
       html.dc-modern [class*="playControls__play"] svg {
         fill: #0b0c10 !important;
       }
 
-      /* Акцентные кнопки — цвет текущей темы (монохром по умолчанию) */
+      /* Акцентные кнопки — цвет текущей темы */
       html.dc-theme .header__goUpsell,
       html.dc-theme .sc-button-cta,
       html.dc-theme .sc-button-primary {
@@ -626,93 +940,153 @@
         color: var(--dc-accent) !important;
         fill: var(--dc-accent) !important;
       }
-      /* Кнопка воспроизведения/паузы на обложках (Play/Pause button overlay) — всегда идеальный круг */
-      html.dc-modern .sc-button-play:not([class*="playControls__play"]),
-      html.dc-modern .sc-button-pause:not([class*="playControls__play"]),
-      html.dc-modern .playButton,
-      html.dc-modern [class*="playButton" i],
-      html.dc-modern .image__button,
+
+      /* Обёртки кнопок на обложках — прозрачные, без рамок и лишних теней */
+      html.dc-modern .image__buttonWrapper,
+      html.dc-modern .image__playButton,
+      html.dc-modern div[class*="playButton" i],
+      html.dc-modern .coverArt__playButton:not(button) {
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+      }
+
+      /* Затемнение обложки при наведении: мягкое и аккуратное */
+      html.dc-modern .image__lightOverlay {
+        background: rgba(0, 0, 0, 0.35) !important;
+        opacity: 1 !important;
+      }
+
+      /* Кнопки Play/Pause на обложках — стеклянный круг строго по центру */
+      html.dc-modern button.sc-button-play:not([class*="playControls__play"]),
+      html.dc-modern button.sc-button-pause:not([class*="playControls__play"]),
+      html.dc-modern button.playButton,
+      html.dc-modern button.image__button,
+      html.dc-modern .image__playButton button,
+      html.dc-modern .image__buttonWrapper button.sc-button-play,
+      html.dc-modern .image__buttonWrapper button.sc-button-pause,
       html.dc-modern .coverArt__playButton button,
-      html.dc-modern [class*="coverArt"] button,
-      html.dc-theme .sc-button-play:not([class*="playControls__play"]),
-      html.dc-theme .sc-button-pause:not([class*="playControls__play"]),
-      html.dc-theme .playButton {
+      html.dc-modern .sound__coverArt button.sc-button-play,
+      html.dc-modern .sound__coverArt button.sc-button-pause,
+      html.dc-modern .soundBadge__coverArt button.sc-button-play,
+      html.dc-modern .soundBadge__coverArt button.sc-button-pause,
+      html.dc-theme button.sc-button-play:not([class*="playControls__play"]),
+      html.dc-theme button.sc-button-pause:not([class*="playControls__play"]),
+      html.dc-theme button.playButton {
         border-radius: 50% !important;
-        background-color: rgba(15, 17, 23, 0.88) !important;
+        background-color: rgba(15, 17, 23, 0.86) !important;
         -webkit-backdrop-filter: blur(16px) !important;
         backdrop-filter: blur(16px) !important;
-        border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
         color: #ffffff !important;
-        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55) !important;
-        transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5) !important;
+        cursor: pointer !important;
+        transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease !important;
       }
-      html.dc-modern .sc-button-play:not([class*="playControls__play"]):hover,
-      html.dc-modern .sc-button-pause:not([class*="playControls__play"]):hover,
-      html.dc-modern .playButton:hover,
-      html.dc-modern [class*="playButton" i]:hover,
-      html.dc-modern .image__button:hover,
+
+      /* Фиксация центра кнопки на обложках карточек */
+      html.dc-modern .image__button,
+      html.dc-modern .image__playButton button,
+      html.dc-modern .soundBadge__coverArt button.sc-button-play,
+      html.dc-modern .soundBadge__coverArt button.sc-button-pause,
+      html.dc-modern .sound__coverArt button.sc-button-play,
+      html.dc-modern .sound__coverArt button.sc-button-pause,
+      html.dc-modern .coverArt button.sc-button-play,
+      html.dc-modern .coverArt button.sc-button-pause,
+      html.dc-modern .trackItem__artwork button.sc-button-play,
+      html.dc-modern .trackItem__artwork button.sc-button-pause {
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        transform-origin: center center !important;
+        margin: 0 !important;
+      }
+
+      /* Hover: центрирование translate(-50%, -50%) сохраняется, нет сдвига в правый нижний угол! */
+      html.dc-modern button.sc-button-play:not([class*="playControls__play"]):hover,
+      html.dc-modern button.sc-button-pause:not([class*="playControls__play"]):hover,
+      html.dc-modern button.playButton:hover,
+      html.dc-modern button.image__button:hover,
+      html.dc-modern .image__playButton button:hover,
       html.dc-modern .coverArt__playButton button:hover,
-      html.dc-modern [class*="coverArt"] button:hover,
-      html.dc-theme .sc-button-play:not([class*="playControls__play"]):hover,
-      html.dc-theme .sc-button-pause:not([class*="playControls__play"]):hover,
-      html.dc-theme .playButton:hover {
-        transform: scale(1.08) !important;
-        background-color: var(--dc-accent) !important;
-        border-color: var(--dc-accent) !important;
-        color: #0b0c10 !important;
-        box-shadow: 0 8px 26px var(--dc-accent-soft), 0 4px 16px rgba(0,0,0,0.6) !important;
+      html.dc-theme button.sc-button-play:not([class*="playControls__play"]):hover,
+      html.dc-theme button.sc-button-pause:not([class*="playControls__play"]):hover,
+      html.dc-theme button.playButton:hover {
+        background-color: rgba(26, 30, 42, 0.94) !important;
+        border-color: rgba(255, 255, 255, 0.75) !important;
+        color: var(--dc-accent) !important;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65), 0 0 16px var(--dc-accent-soft) !important;
       }
-      /* Иконка внутри кнопки воспроизведения/паузы на обложке */
-      html.dc-modern .sc-button-play:not([class*="playControls__play"]) svg,
-      html.dc-modern .sc-button-pause:not([class*="playControls__play"]) svg,
-      html.dc-modern .playButton svg,
-      html.dc-modern [class*="playButton" i] svg,
-      html.dc-modern .image__button svg,
-      html.dc-modern .coverArt__playButton svg,
-      html.dc-modern [class*="coverArt"] button svg,
-      html.dc-modern .sc-button-play:not([class*="playControls__play"]) path,
-      html.dc-modern .sc-button-pause:not([class*="playControls__play"]) path,
-      html.dc-modern .playButton path,
-      html.dc-modern [class*="playButton" i] path,
-      html.dc-modern .image__button path,
-      html.dc-modern .coverArt__playButton path,
-      html.dc-modern [class*="coverArt"] button path {
+
+      html.dc-modern .image__button:hover,
+      html.dc-modern .image__playButton button:hover,
+      html.dc-modern .soundBadge__coverArt button.sc-button-play:hover,
+      html.dc-modern .soundBadge__coverArt button.sc-button-pause:hover,
+      html.dc-modern .sound__coverArt button.sc-button-play:hover,
+      html.dc-modern .sound__coverArt button.sc-button-pause:hover,
+      html.dc-modern .coverArt button.sc-button-play:hover,
+      html.dc-modern .coverArt button.sc-button-pause:hover,
+      html.dc-modern .trackItem__artwork button.sc-button-play:hover,
+      html.dc-modern .trackItem__artwork button.sc-button-pause:hover {
+        transform: translate(-50%, -50%) scale(1.05) !important;
+      }
+
+      /* Иконка play/pause внутри кнопки на обложках */
+      html.dc-modern button.sc-button-play:not([class*="playControls__play"]) svg,
+      html.dc-modern button.sc-button-pause:not([class*="playControls__play"]) svg,
+      html.dc-modern button.playButton svg,
+      html.dc-modern button.image__button svg,
+      html.dc-modern .image__playButton button svg,
+      html.dc-modern .coverArt__playButton button svg,
+      html.dc-modern button.sc-button-play:not([class*="playControls__play"]) path,
+      html.dc-modern button.sc-button-pause:not([class*="playControls__play"]) path,
+      html.dc-modern button.playButton path,
+      html.dc-modern button.image__button path,
+      html.dc-modern .image__playButton button path,
+      html.dc-modern .coverArt__playButton button path {
         fill: #ffffff !important;
         color: #ffffff !important;
         transition: fill 140ms ease !important;
       }
-      html.dc-modern .sc-button-play:not([class*="playControls__play"]):hover svg,
-      html.dc-modern .sc-button-pause:not([class*="playControls__play"]):hover svg,
-      html.dc-modern .playButton:hover svg,
-      html.dc-modern [class*="playButton" i]:hover svg,
-      html.dc-modern .image__button:hover svg,
-      html.dc-modern .coverArt__playButton button:hover svg,
-      html.dc-modern [class*="coverArt"] button:hover svg,
-      html.dc-modern .sc-button-play:not([class*="playControls__play"]):hover path,
-      html.dc-modern .sc-button-pause:not([class*="playControls__play"]):hover path,
-      html.dc-modern .playButton:hover path,
-      html.dc-modern [class*="playButton" i]:hover path,
-      html.dc-modern .image__button:hover path,
-      html.dc-modern .coverArt__playButton button:hover path,
-      html.dc-modern [class*="coverArt"] button:hover path {
-        fill: #0b0c10 !important;
-        color: #0b0c10 !important;
-      }
-      html.dc-modern .image__buttonWrapper {
-        background: transparent !important;
-        border: none !important;
-      }
-      /* Лайки не перекрашиваем: красное сердце — часть SoundCloud */
 
-      /* noAds V9: жёсткое скрытие рекламы даже если network-правило пропустило */
+      html.dc-modern button.sc-button-play:not([class*="playControls__play"]):hover svg,
+      html.dc-modern button.sc-button-pause:not([class*="playControls__play"]):hover svg,
+      html.dc-modern button.playButton:hover svg,
+      html.dc-modern button.image__button:hover svg,
+      html.dc-modern .image__playButton button:hover svg,
+      html.dc-modern .coverArt__playButton button:hover svg,
+      html.dc-modern button.sc-button-play:not([class*="playControls__play"]):hover path,
+      html.dc-modern button.sc-button-pause:not([class*="playControls__play"]):hover path,
+      html.dc-modern button.playButton:hover path,
+      html.dc-modern button.image__button:hover path,
+      html.dc-modern .image__playButton button:hover path,
+      html.dc-modern .coverArt__playButton button:hover path {
+        fill: var(--dc-accent) !important;
+        color: var(--dc-accent) !important;
+      }
+
+      /* Кнопки действий под кнопкой play на обложке (сердечко, репост...) */
+      html.dc-modern .image__buttonWrapper .sc-button-group,
+      html.dc-modern .soundBadge__actions .sc-button-group {
+        background: rgba(15, 17, 23, 0.85) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        backdrop-filter: blur(12px) !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        padding: 2px !important;
+      }
+
+      /* noAds V9 */
       html.dc-noads [data-dc-ad],
       html.dc-noads [data-dc-promo] {
         display: none !important;
       }
 
-      /* Скругление обложек: SoundCloud рисует каверы абсолютно-позиционированными
-         слоями, которые overflow:hidden статичного предка НЕ обрезает — поэтому
-         радиус ставится и на сам рисуемый узел, а маска чистит углы. */
+      /* Скругление обложек */
       html.dc-rounded [data-dc-artwork] {
         border-radius: 11px !important;
         overflow: hidden !important;
@@ -761,21 +1135,15 @@
         html.dc-modern [data-dc-player],
         html.dc-modern [data-dc-playerbar],
         html.dc-modern footer,
-        html.dc-modern [class*="playControls" i] {
+        html.dc-modern section.playControls,
+        html.dc-modern div.playControls:not([class*="playControls__"]) {
           -webkit-backdrop-filter: none !important;
           backdrop-filter: none !important;
           background: #111318 !important;
         }
       }
 
-      html.dc-compact .l-container,
-      html.dc-compact .l-content { max-width: 1320px !important; }
-      html.dc-compact .soundList__item,
-      html.dc-compact .trackItem { margin-bottom: 12px !important; }
-      html.dc-compact .soundBadge { margin-bottom: 14px !important; }
-      html.dc-compact [data-dc-player],
-      html.dc-compact [data-dc-playerbar] { min-height: 46px !important; }
-
+      /* Focus Mode */
       html.dc-focus [data-dc-right-rail],
       html.dc-focus [data-dc-comments],
       html.dc-focus [data-dc-promo] { display: none !important; }
@@ -794,7 +1162,18 @@
     } catch (_) {}
   }
 
+  function cleanupBrokenPlayerTags() {
+    try {
+      document.querySelectorAll('[data-dc-player]').forEach(el => {
+        if (el.className && typeof el.className === 'string' && /playControls__/i.test(el.className)) {
+          el.removeAttribute('data-dc-player');
+        }
+      });
+    } catch (_) {}
+  }
+
   function tag(scope = document) {
+    cleanupBrokenPlayerTags();
     markAll(scope, selectors.header, 'data-dc-header');
     markAll(scope, selectors.player, 'data-dc-player');
     markPlayerBar(scope);
@@ -806,7 +1185,6 @@
     markAll(scope, selectors.ads, 'data-dc-ad');
   }
 
-  // Родительская плита плеера (footer-обёртка): на ней тоже стекло.
   function markPlayerBar(scope) {
     try {
       const found = [];
@@ -835,8 +1213,6 @@
     } catch (_) {}
   }
 
-  // Промо-треки в лентах: бейдж "Promoted"/"Sponsored" переживает
-  // переименования классов — ищем по тексту коротких элементов.
   function removePromotedCards(scope = document) {
     if (!state.settings.adBlock) return;
     try {
@@ -856,10 +1232,7 @@
   function skipAudioAds(scope = document) {
     if (!state.settings.adBlock) return;
     try {
-      const audios = scope instanceof Element && scope.tagName === 'AUDIO'
-        ? [scope]
-        : Array.from(scope.querySelectorAll?.('audio') ?? []);
-      for (const a of audios) {
+      for (const a of audioElements(scope)) {
         const src = (a.currentSrc || a.src || '').toLowerCase();
         if (a.hasAttribute('data-ad') ||
             src.includes('advert') || src.includes('/ads/') || src.includes('promotion') ||
@@ -876,7 +1249,6 @@
     const accent = state.settings.accent || 'mono';
     if (accent === 'amber') root.classList.add('dc-accent-amber');
     else if (accent === 'blue') root.classList.add('dc-accent-blue');
-    // Системный акцент: приложение присылает точный hex macOS.
     if (accent === 'system' && typeof state.settings.accentHex === 'string' && state.settings.accentHex) {
       root.style.setProperty('--dc-accent', state.settings.accentHex);
       root.style.setProperty('--dc-accent-border', state.settings.accentHex);
@@ -888,35 +1260,77 @@
 
   function applyClasses() {
     const s = state.settings;
-    root.classList.toggle('dc-modern', false); // Временно недоступно (сломано, чинится)
+    root.classList.toggle('dc-modern', Boolean(s.modernDesign));
     root.classList.toggle('dc-theme', Boolean(s.theme));
     root.classList.toggle('dc-rounded', Boolean(s.roundedCards));
     root.classList.toggle('dc-hover', Boolean(s.artworkHover));
-    root.classList.toggle('dc-compact', false); // Временно недоступно (сломано, чинится)
+    root.classList.remove('dc-compact');
     root.classList.toggle('dc-focus', Boolean(s.focus));
     root.classList.toggle('dc-noads', Boolean(s.adBlock));
     applyAccent();
+    fixModernTopGap();
   }
 
   // ── Мост в приложение ────────────────────────────────────────────
-  // Тихая отправка: если хендлера нет (старая сборка, обычный браузер) — молча выходим.
   function post(type, payload) {
     try {
       window.webkit?.messageHandlers?.diecloudeBridge?.postMessage({ type: type, ...payload });
     } catch (_) {}
   }
 
-  // ── Now Playing: читаем состояние из <audio> и бейджа плеера ──────
-  const nowPlaying = { cleanup: [], lastMetaKey: '', lastPost: 0, missingReported: false, missingCheckPending: false, missingTimer: 0 };
+  // ── Перехват <audio> (включая detached new Audio()) + Now Playing + громкость ──
+  const nowPlaying = {
+    cleanup: [],
+    lastMetaKey: '',
+    lastPost: 0,
+    missingReported: false,
+    missingCheckPending: false,
+    missingTimer: 0
+  };
+
+  const trackedMedias = new Set();
+  let activeMedia = null;
+  let applyingVolume = false;
+  let volumeSyncTimer = 0;
+
+  function applyStoredVolumeToMedia(media) {
+    if (!media) return;
+    applyingVolume = true;
+    try {
+      if (typeof state.settings.volume === 'number' && Number.isFinite(state.settings.volume)) {
+        const target = Math.max(0, Math.min(1, state.settings.volume));
+        if (Math.abs(media.volume - target) > 0.005) {
+          media.volume = target;
+        }
+      }
+      if (typeof state.settings.isMuted === 'boolean' && media.muted !== state.settings.isMuted) {
+        media.muted = state.settings.isMuted;
+      }
+    } catch (_) {}
+    applyingVolume = false;
+  }
 
   function audioElements(scope = document) {
     if (scope instanceof Element && scope.tagName === 'AUDIO') return [scope];
     return Array.from(scope.querySelectorAll?.('audio') ?? []);
   }
 
+  function getActiveMedia() {
+    if (activeMedia && !activeMedia.paused) return activeMedia;
+    for (const m of trackedMedias) {
+      if (!m.paused) { activeMedia = m; return m; }
+    }
+    for (const a of audioElements(document)) {
+      hookSingleAudio(a);
+      if (!a.paused) { activeMedia = a; return a; }
+    }
+    return activeMedia || audioElements(document)[0] || Array.from(trackedMedias)[0] || null;
+  }
+
   function postState(a) {
+    if (!a) return;
     const now = performance.now();
-    if (now - nowPlaying.lastPost < 900 && !a.paused) return; // троттлинг ~1с
+    if (now - nowPlaying.lastPost < 900 && !a.paused) return;
     nowPlaying.lastPost = now;
     post('state', {
       playing: !a.paused && !a.ended,
@@ -949,38 +1363,137 @@
     post('meta', meta);
   }
 
-  function hookAudio(scope = document) {
-    for (const a of audioElements(scope)) {
-      if (a.dataset.dcHooked) continue;
-      a.dataset.dcHooked = '1';
-      const onPlay = () => { postState(a); maybePostMeta(); };
-      const onPause = () => postState(a);
-      const onTime = () => postState(a);
-      const onLoaded = () => { postState(a); maybePostMeta(); };
-      const onEnded = () => postState(a);
-      a.addEventListener('play', onPlay);
-      a.addEventListener('pause', onPause);
-      a.addEventListener('timeupdate', onTime);
-      a.addEventListener('loadedmetadata', onLoaded);
-      a.addEventListener('ended', onEnded);
-      nowPlaying.cleanup.push(() => {
-        a.removeEventListener('play', onPlay);
-        a.removeEventListener('pause', onPause);
-        a.removeEventListener('timeupdate', onTime);
-        a.removeEventListener('loadedmetadata', onLoaded);
-        a.removeEventListener('ended', onEnded);
-      });
+  function hookSingleAudio(a) {
+    if (!a) return;
+    trackedMedias.add(a);
+    applyStoredVolumeToMedia(a);
+    if (a.dataset?.dcHooked === '1' || a._dcHooked) return;
+    try { if (a.dataset) a.dataset.dcHooked = '1'; } catch (_) {}
+    a._dcHooked = true;
+
+    const onPlay = () => {
+      activeMedia = a;
+      applyStoredVolumeToMedia(a);
       postState(a);
       maybePostMeta();
+    };
+    const onPause = () => { if (!activeMedia || activeMedia === a) postState(a); };
+    const onTime = () => { if (!activeMedia || activeMedia === a) postState(a); };
+    const onLoaded = () => {
+      activeMedia = a;
+      applyStoredVolumeToMedia(a);
+      postState(a);
+      maybePostMeta();
+    };
+    const onEnded = () => postState(a);
+    const onVolumeChange = () => {
+      if (applyingVolume) return;
+      state.settings.volume = a.volume;
+      state.settings.isMuted = a.muted;
+      persistVolumeLocal(a.volume, a.muted);
+      clearTimeout(volumeSyncTimer);
+      volumeSyncTimer = setTimeout(() => {
+        post('volume', { volume: a.volume, muted: a.muted });
+      }, 120);
+    };
+
+    a.addEventListener('play', onPlay);
+    a.addEventListener('pause', onPause);
+    a.addEventListener('timeupdate', onTime);
+    a.addEventListener('loadedmetadata', onLoaded);
+    a.addEventListener('ended', onEnded);
+    a.addEventListener('volumechange', onVolumeChange);
+
+    nowPlaying.cleanup.push(() => {
+      a.removeEventListener('play', onPlay);
+      a.removeEventListener('pause', onPause);
+      a.removeEventListener('timeupdate', onTime);
+      a.removeEventListener('loadedmetadata', onLoaded);
+      a.removeEventListener('ended', onEnded);
+      a.removeEventListener('volumechange', onVolumeChange);
+    });
+
+    postState(a);
+    maybePostMeta();
+  }
+
+  function hookAudio(scope = document) {
+    for (const a of audioElements(scope)) {
+      hookSingleAudio(a);
     }
   }
 
-  // ── Диагностика: панель плеера не найдена ─────────────────────────
-  // Не спешим с негативом: React-панель может отрисоваться позже,
-  // поэтому «не найдено» отправляется только если через 5с всё ещё пусто.
+  // Одноразовый глобальный перехват HTMLMediaElement.play и new Audio() (для detached audio)
+  if (!window.__diecloudeAudioPatched) {
+    window.__diecloudeAudioPatched = true;
+    const origPlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (...args) {
+      try {
+        const eng = window.__diecloude;
+        if (eng && typeof eng._onMediaPlay === 'function') eng._onMediaPlay(this);
+      } catch (_) {}
+      return origPlay.apply(this, args);
+    };
+
+    const OrigAudio = window.Audio;
+    if (OrigAudio) {
+      window.Audio = function (...args) {
+        const inst = new OrigAudio(...args);
+        try {
+          const eng = window.__diecloude;
+          if (eng && typeof eng._onAudioCreated === 'function') eng._onAudioCreated(inst);
+        } catch (_) {}
+        return inst;
+      };
+      window.Audio.prototype = OrigAudio.prototype;
+    }
+  }
+
+  state._onMediaPlay = (media) => {
+    hookSingleAudio(media);
+    activeMedia = media;
+    applyStoredVolumeToMedia(media);
+  };
+  state._onAudioCreated = (media) => {
+    hookSingleAudio(media);
+  };
+
+  // ── Горячие клавиши в DOM (capture-фаза для Space и Esc) ──────────
+  function isEditableTarget(el) {
+    if (!el || !(el instanceof Element)) return false;
+    const t = el.tagName;
+    if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return true;
+    if (el.isContentEditable) return true;
+    const role = (el.getAttribute('role') || '').toLowerCase();
+    if (role === 'textbox' || role === 'searchbox' || role === 'combobox') return true;
+    return Boolean(el.closest('input, textarea, [contenteditable="true"], [role="searchbox"], [role="combobox"]'));
+  }
+
+  const onKeyDown = (e) => {
+    if (e.defaultPrevented || e.isComposing) return;
+    if (e.key === 'Escape') {
+      post('escape', {});
+      if (isEditableTarget(e.target) && typeof e.target.blur === 'function') {
+        e.target.blur();
+      }
+      return;
+    }
+    if ((e.code === 'Space' || e.key === ' ') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (document.activeElement && document.activeElement !== document.body) {
+        try { document.activeElement.blur(); } catch (_) {}
+      }
+      state.togglePlay();
+    }
+  };
+  window.addEventListener('keydown', onKeyDown, true);
+
+  // ── Диагностика панели плеера ────────────────────────────────────
   function reportPlayerPresence() {
     const found = Boolean(
-      document.querySelector('[data-dc-playerbar], [data-dc-player], .playControls, [class*="playControls" i]')
+      document.querySelector('[data-dc-playerbar], [data-dc-player], section.playControls, div.playControls:not([class*="playControls__"])')
     );
     if (found) {
       if (nowPlaying.missingReported) {
@@ -993,7 +1506,7 @@
     nowPlaying.missingCheckPending = true;
     nowPlaying.missingTimer = setTimeout(() => {
       nowPlaying.missingCheckPending = false;
-      const stillMissing = !document.querySelector('[data-dc-playerbar], [data-dc-player], .playControls, [class*="playControls" i]');
+      const stillMissing = !document.querySelector('[data-dc-playerbar], [data-dc-player], section.playControls, div.playControls:not([class*="playControls__"])');
       if (stillMissing && !nowPlaying.missingReported) {
         nowPlaying.missingReported = true;
         post('playerMissing', {});
@@ -1001,14 +1514,11 @@
     }, 5000);
   }
 
-  // Структурный поиск планки плеера: классы SoundCloud периодически
-  // переименовываются, поэтому ищем широкую невысокую полосу у нижнего
-  // края вьюпорта (fixed она или sticky — не важно, новый DOM бывает absolute).
   function ensurePlayerBar() {
     try {
       const marked = document.querySelector('[data-dc-playerbar]');
       if (marked && marked.isConnected) return;
-      const el = document.querySelector(selectors.player) || document.querySelector('.playControls, [class*="playControls" i]');
+      const el = document.querySelector(selectors.player);
       if (el) {
         el.setAttribute('data-dc-player', '');
         const bar = (el.closest && el.closest(selectors.playerBar)) || el;
@@ -1017,8 +1527,71 @@
     } catch (_) {}
   }
 
+  function fixModernTopGap() {
+    if (!root.classList.contains('dc-modern')) {
+      try {
+        const hi = document.querySelector('.header__inner');
+        if (hi) {
+          hi.style.removeProperty('padding-bottom');
+          hi.style.removeProperty('padding-top');
+          hi.style.removeProperty('height');
+          hi.style.removeProperty('max-height');
+        }
+        const h = document.querySelector('.header, header[role="banner"]');
+        if (h) {
+          h.style.removeProperty('height');
+          h.style.removeProperty('max-height');
+        }
+        const lc = document.querySelector('.l-container.l-content, #app > .l-container');
+        if (lc) {
+          lc.style.removeProperty('padding-top');
+        }
+        const content = document.getElementById('content');
+        if (content) {
+          content.style.removeProperty('padding-top');
+          content.style.removeProperty('margin-top');
+        }
+        const lNav = document.querySelector('.l-nav');
+        if (lNav) {
+          lNav.style.removeProperty('margin-top');
+        }
+      } catch (_) {}
+      return;
+    }
+    try {
+      const hi = document.querySelector('.header__inner');
+      if (hi) {
+        hi.style.setProperty('padding-bottom', '0px', 'important');
+        hi.style.setProperty('padding-top', '0px', 'important');
+        hi.style.setProperty('height', '46px', 'important');
+        hi.style.setProperty('max-height', '46px', 'important');
+      }
+      const h = document.querySelector('.header, header[role="banner"]');
+      if (h) {
+        h.style.setProperty('height', '46px', 'important');
+        h.style.setProperty('max-height', '46px', 'important');
+      }
+      const lc = document.querySelector('.l-container.l-content, #app > .l-container');
+      if (lc) {
+        lc.style.setProperty('padding-top', '46px', 'important');
+      }
+      const content = document.getElementById('content');
+      if (content) {
+        content.style.setProperty('padding-top', '0px', 'important');
+        content.style.setProperty('margin-top', '0px', 'important');
+      }
+      const lNav = document.querySelector('.l-nav');
+      if (lNav) {
+        lNav.style.setProperty('margin-top', '6px', 'important');
+      }
+    } catch (_) {}
+  }
+
   function refresh(scope = document) {
-    if (scope === document) ensurePlayerBar();
+    if (scope === document) {
+      ensurePlayerBar();
+      fixModernTopGap();
+    }
     tag(scope);
     removeAds(scope);
     removePromotedCards(scope);
@@ -1029,8 +1602,6 @@
   }
 
   function schedule(nodes) {
-    // Дебаунс 180мс. Раньше повторные мутации во время таймера отбрасывались —
-    // реклама/аудио, появившиеся в этом окне, могли не обработаться.
     for (const n of nodes) {
       if (n instanceof Element) state.pendingNodes.push(n);
     }
@@ -1040,7 +1611,6 @@
       const batch = state.pendingNodes;
       state.pendingNodes = [];
       try {
-        // Если накопилось слишком много узлов — дешевле один проход по document.
         if (batch.length > 40) {
           refresh(document);
           return;
@@ -1060,29 +1630,117 @@
         applyClasses();
       });
       maybePostMeta();
-    }, 220);
+    }, 200);
   }
 
-  addStyle();
+  // ── Публичный API window.__diecloude ─────────────────────────────
   state.set = (key, value) => {
     state.settings[key] = value;
     refresh(document);
   };
   state.setAll = values => {
     Object.assign(state.settings, values || {});
+    if (typeof values?.volume === 'number' || typeof values?.isMuted === 'boolean') {
+      persistVolumeLocal(state.settings.volume, state.settings.isMuted);
+      trackedMedias.forEach(m => applyStoredVolumeToMedia(m));
+      for (const a of audioElements(document)) applyStoredVolumeToMedia(a);
+    }
     refresh(document);
   };
   state.refresh = () => refresh(document);
-  // Перемотка из системного плеера / медиа-клавиш
-  state.seek = seconds => {
-    const a = document.querySelector('audio');
-    if (a && isFinite(seconds)) {
-      try { a.currentTime = Math.max(0, Math.min(seconds, a.duration || seconds)); postState(a); } catch (_) {}
+
+  state.togglePlay = () => {
+    const b = document.querySelector('.playControls__play, button.playControl')
+      || Array.from(document.querySelectorAll('button[aria-label]'))
+        .find(el => /play current|pause current|воспроизвед|пауз/i.test(el.getAttribute('aria-label') || ''));
+    if (b) {
+      b.click();
+      setTimeout(() => { const m = getActiveMedia(); if (m) postState(m); }, 60);
+      return true;
     }
+    const a = getActiveMedia();
+    if (a) {
+      if (a.paused) a.play(); else a.pause();
+      return true;
+    }
+    return false;
   };
+
+  state.next = () => {
+    const b = document.querySelector('.skipControls__next')
+      || Array.from(document.querySelectorAll('button[aria-label]'))
+        .find(el => /next|следующ/i.test(el.getAttribute('aria-label') || ''));
+    if (b) { b.click(); setTimeout(maybePostMeta, 180); return true; }
+    return false;
+  };
+
+  state.prev = () => {
+    const b = document.querySelector('.skipControls__previous')
+      || Array.from(document.querySelectorAll('button[aria-label]'))
+        .find(el => /previous|prev|предыдущ/i.test(el.getAttribute('aria-label') || ''));
+    if (b) { b.click(); setTimeout(maybePostMeta, 180); return true; }
+    return false;
+  };
+
+  state.seek = seconds => {
+    const a = getActiveMedia();
+    if (a && isFinite(seconds)) {
+      try { a.currentTime = Math.max(0, Math.min(seconds, a.duration || seconds)); postState(a); return true; } catch (_) {}
+    }
+    return false;
+  };
+
+  state.seekBy = delta => {
+    const a = getActiveMedia();
+    if (a && isFinite(delta)) {
+      return state.seek((a.currentTime || 0) + delta);
+    }
+    return false;
+  };
+
+  state.setVolume = vol => {
+    const v = Math.max(0, Math.min(1, Number(vol)));
+    if (!Number.isFinite(v)) return false;
+    state.settings.volume = v;
+    if (v > 0 && state.settings.isMuted) state.settings.isMuted = false;
+    persistVolumeLocal(v, state.settings.isMuted);
+    trackedMedias.forEach(m => applyStoredVolumeToMedia(m));
+    for (const a of audioElements(document)) applyStoredVolumeToMedia(a);
+    post('volume', { volume: state.settings.volume, muted: state.settings.isMuted });
+    return true;
+  };
+
+  state.changeVolume = delta => {
+    const cur = typeof state.settings.volume === 'number' ? state.settings.volume : 0.8;
+    return state.setVolume(cur + Number(delta));
+  };
+
+  state.toggleMute = () => {
+    state.settings.isMuted = !state.settings.isMuted;
+    persistVolumeLocal(state.settings.volume, state.settings.isMuted);
+    trackedMedias.forEach(m => applyStoredVolumeToMedia(m));
+    for (const a of audioElements(document)) applyStoredVolumeToMedia(a);
+    const muteBtn = document.querySelector('.volume__button');
+    if (!getActiveMedia() && muteBtn) muteBtn.click();
+    post('volume', { volume: state.settings.volume, muted: state.settings.isMuted });
+    return state.settings.isMuted;
+  };
+
+  state.toggleLike = () => {
+    const btn = document.querySelector('.playControls .sc-button-like, .playbackSoundBadge__like');
+    if (btn) { btn.click(); return true; }
+    return false;
+  };
+
   state.destroy = () => {
+    window.removeEventListener('keydown', onKeyDown, true);
     state.observer?.disconnect();
     if (state.timer) clearTimeout(state.timer);
+    if (volumeSyncTimer) clearTimeout(volumeSyncTimer);
+    if (state._scrollHandler) {
+      window.removeEventListener('scroll', state._scrollHandler);
+      state._scrollHandler = null;
+    }
     state.timer = 0;
     state.pendingNodes = [];
     if (state.frame) cancelAnimationFrame(state.frame);
@@ -1101,15 +1759,50 @@
   window.__diecloudeThemeEngine = state;
   window.__diecloude = state;
 
-  state.observer = new MutationObserver(records => {
-    const batch = [];
-    for (const record of records) {
-      for (const node of record.addedNodes) {
-        if (node instanceof Element) batch.push(node);
+  function boot() {
+    addStyle();
+    const observeTarget = document.body || root;
+    state.observer = new MutationObserver(records => {
+      const batch = [];
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node instanceof Element) batch.push(node);
+        }
       }
+      if (batch.length) schedule(batch);
+    });
+    if (observeTarget) {
+      state.observer.observe(observeTarget, { childList: true, subtree: true });
     }
-    if (batch.length) schedule(batch);
-  });
-  state.observer.observe(document.body || root, { childList: true, subtree: true });
-  refresh(document);
+
+    // Поддержка бесконечной подгрузки списка треков при достижении конца ленты
+    let scrollTicking = false;
+    state._scrollHandler = () => {
+      if (scrollTicking) return;
+      scrollTicking = true;
+      requestAnimationFrame(() => {
+        scrollTicking = false;
+        const scrollBottom = window.innerHeight + window.scrollY;
+        const totalHeight = Math.max(
+          document.body ? document.body.scrollHeight : 0,
+          document.documentElement ? document.documentElement.scrollHeight : 0
+        );
+        if (totalHeight > 0 && totalHeight - scrollBottom < 280) {
+          const spinner = document.querySelector('.lazyLoadingList__spinner, [class*="spinner" i]');
+          if (spinner && spinner.offsetParent !== null) {
+            window.dispatchEvent(new CustomEvent('scroll'));
+          }
+        }
+      });
+    };
+    window.addEventListener('scroll', state._scrollHandler, { passive: true });
+
+    refresh(document);
+  }
+
+  if (root) {
+    boot();
+  } else {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  }
 })();

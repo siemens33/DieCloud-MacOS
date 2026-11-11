@@ -134,26 +134,29 @@ if readme.exists():
         text,
         count=1,
     )
-    whats_new = f'## Что нового в {version}\n\n- {notes.strip()}\n'
-    text, count = re.subn(
-        r'## Что нового в [0-9]+\.[0-9]+\.[0-9]+\n.*?(?=\n## )',
-        whats_new.rstrip(),
-        text,
-        count=1,
-        flags=re.S,
-    )
-    if count == 0:
-        if '</div>' in text:
-            text = text.replace('</div>', '</div>\n\n' + whats_new, 1)
-        else:
-            text = whats_new + '\n' + text
+    if f'## Что нового в {version}' not in text:
+        whats_new = f'## Что нового в {version}\n\n- {notes.strip()}\n'
+        text, count = re.subn(
+            r'## Что нового в [0-9]+\.[0-9]+\.[0-9]+\n.*?(?=\n## )',
+            whats_new.rstrip(),
+            text,
+            count=1,
+            flags=re.S,
+        )
+        if count == 0:
+            if '</div>' in text:
+                text = text.replace('</div>', '</div>\n\n' + whats_new, 1)
+            else:
+                text = whats_new + '\n' + text
     readme.write_text(text, encoding='utf-8')
 
-Path('RELEASE_NOTES.md').write_text(
-    f'# DieCloude {version}\n\n## Что изменилось\n\n- {notes.strip()}\n\n'
-    '## Скачать\n\nИспользуй файл `DieCloude.dmg` из раздела Assets.\n',
-    encoding='utf-8',
-)
+rel_notes = Path('RELEASE_NOTES.md')
+if not rel_notes.exists() or f'# DieCloude {version}' not in rel_notes.read_text(encoding='utf-8'):
+    rel_notes.write_text(
+        f'# DieCloude {version}\n\n## Что изменилось\n\n- {notes.strip()}\n\n'
+        '## Скачать\n\nИспользуй файл `DieCloude.dmg` из раздела Assets.\n',
+        encoding='utf-8',
+    )
 PY
 
 plutil -lint Info.plist >/dev/null

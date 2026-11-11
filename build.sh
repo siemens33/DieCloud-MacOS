@@ -15,7 +15,7 @@ mkdir -p "$MACOS" "$RESOURCES" "$ICONSET"
 
 SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
 SWIFTC="$(xcrun --find swiftc)"
-SOURCES=("$ROOT/src/main.swift" "$ROOT/src/VPN.swift" "$ROOT/src/UpdateManager.swift" "$ROOT/src/AdBlockService.swift" "$ROOT/src/NowPlaying.swift")
+SOURCES=("$ROOT"/src/**/*.swift)
 
 COMMON=(-O -whole-module-optimization -sdk "$SDK_PATH" -framework AppKit -framework WebKit -framework QuartzCore -framework Network -framework Security -framework MediaPlayer)
 

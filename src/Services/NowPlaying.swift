@@ -15,9 +15,9 @@ private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
 /// Мост «страница → приложение» и системный Now Playing.
 ///
 /// JS-движок темы шлёт состояние плеера через message handler "diecloudeBridge"
-/// (state / meta / playerMissing), а команды системного плеера — медиа-клавиши
-/// F7–F9, кнопки наушников, экран блокировки — возвращаются в страницу
-/// кликами по кнопкам SoundCloud.
+/// (state / meta / volume / escape / playerMissing / playerFound), а команды системного
+/// плеера — медиа-клавиши F7–F9, кнопки наушников, экран блокировки — возвращаются
+/// в страницу кликами по кнопкам SoundCloud.
 final class NowPlayingController: NSObject, WKScriptMessageHandler {
     enum PlayerAction { case togglePlay, next, previous }
     static let bridgeName = "diecloudeBridge"
@@ -27,6 +27,8 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
     var performSeek: ((Double) -> Void)?
     var onPlayerMissing: (() -> Void)?
     var onPlayerFound: (() -> Void)?
+    var onVolumeChanged: ((Double?, Bool?) -> Void)?
+    var onEscapePressed: (() -> Void)?
 
     private var info: [String: Any] = [:]
     private var artworkTask: URLSessionDataTask?
@@ -59,14 +61,18 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
-        // Сообщения уже приходят на main в WKWebView; лишний async не нужен,
-        // но оставляем на случай вызова из другого контекста.
         let work = { [weak self] in
+            guard let self else { return }
             switch type {
-            case "state": self?.handleState(body)
-            case "meta": self?.handleMeta(body)
-            case "playerMissing": self?.onPlayerMissing?()
-            case "playerFound": self?.onPlayerFound?()
+            case "state": self.handleState(body)
+            case "meta": self.handleMeta(body)
+            case "volume":
+                let vol = body["volume"] as? Double
+                let muted = body["muted"] as? Bool
+                self.onVolumeChanged?(vol, muted)
+            case "escape": self.onEscapePressed?()
+            case "playerMissing": self.onPlayerMissing?()
+            case "playerFound": self.onPlayerFound?()
             default: break
             }
         }
@@ -148,7 +154,6 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
 
     func disableRemoteCommands() {
         guard !remoteTargets.isEmpty else { return }
-        // Снимаем только наши обработчики (токены от addTarget).
         for (command, target) in remoteTargets {
             command.removeTarget(target)
         }
