@@ -17,7 +17,7 @@
         </Grid.RowDefinitions>
 
         <!-- ── Title Bar (Windows 11 Frameless Header) ── -->
-        <Border Grid.Row="0" Background="#121418" BorderBrush="#1F232B" BorderThickness="0,0,0,1" MouseDown="TitleBar_MouseDown">
+        <Border Grid.Row="0" Background="#121418" BorderBrush="#1F232B" BorderThickness="0,0,0,1">
             <Grid Margin="14,0,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -25,8 +25,9 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: Logo & Badges -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Left: Logo & Badges (Draggable area) -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                            Background="Transparent" MouseDown="TitleBar_MouseDown">
                     <Image Source="pack://application:,,,/resources/DieCloudIcon.ico" Width="20" Height="20" Margin="0,0,10,0"/>
                     <TextBlock Text="DieCloud" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <Border Background="#252A35" CornerRadius="4" Padding="6,2" Margin="0,0,12,0" VerticalAlignment="Center">
@@ -36,36 +37,41 @@
                     <TextBlock x:Name="StatusText" Text="SoundCloud Ready" FontSize="11" Foreground="#6C757D" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Center: Now Playing preview text -->
-                <TextBlock Grid.Column="1" x:Name="TitleNowPlaying" Text="Hear the tracks you love on SoundCloud"
-                           Foreground="#7C8497" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="500"/>
+                <!-- Center: Now Playing preview text (Draggable area) -->
+                <Border Grid.Column="1" Background="Transparent" MouseDown="TitleBar_MouseDown" HorizontalAlignment="Stretch">
+                    <TextBlock x:Name="TitleNowPlaying" Text="Hear the tracks you love on SoundCloud"
+                               Foreground="#7C8497" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="500"/>
+                </Border>
 
-                <!-- Right: Action Buttons & Window Controls -->
+                <!-- Right: Action Buttons & Window Controls (Direct button hits, not draggable) -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- VPN Toggle Button -->
                     <Button x:Name="BtnVpn" Click="BtnVpn_Click" Width="36" Height="32" Margin="0,0,4,0" ToolTip="Изолированный VPN (Xray)"
-                            Background="Transparent" BorderThickness="0" Foreground="#A0A8BA" Cursor="Hand">
+                            Style="{StaticResource TitleBarActionButtonStyle}">
                         <TextBlock Text="🛡️" FontSize="13"/>
                     </Button>
 
                     <!-- Settings Button -->
-                    <Button x:Name="BtnSettings" Click="BtnSettings_Click" Width="36" Height="32" Margin="0,0,12,0" ToolTip="Настройки DieCloud"
-                            Background="Transparent" BorderThickness="0" Foreground="#A0A8BA" Cursor="Hand">
+                    <Button x:Name="BtnSettings" Click="BtnSettings_Click" Width="36" Height="32" Margin="0,0,8,0" ToolTip="Настройки DieCloud"
+                            Style="{StaticResource TitleBarActionButtonStyle}">
                         <TextBlock Text="⚙️" FontSize="14"/>
                     </Button>
 
                     <!-- Minimize -->
-                    <Button Click="BtnMinimize_Click" Width="46" Height="46" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" Cursor="Hand">
+                    <Button Click="BtnMinimize_Click" Width="46" Height="46" ToolTip="Свернуть"
+                            Style="{StaticResource TitleBarWindowButtonStyle}">
                         <TextBlock Text="─" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Button>
 
                     <!-- Maximize/Restore -->
-                    <Button Click="BtnMaximize_Click" Width="46" Height="46" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" Cursor="Hand">
+                    <Button Click="BtnMaximize_Click" Width="46" Height="46" ToolTip="Развернуть"
+                            Style="{StaticResource TitleBarWindowButtonStyle}">
                         <TextBlock x:Name="MaximizeIcon" Text="🗖" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Button>
 
                     <!-- Close -->
-                    <Button Click="BtnClose_Click" Width="46" Height="46" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" Cursor="Hand" Style="{x:Null}">
+                    <Button Click="BtnClose_Click" Width="46" Height="46" ToolTip="Закрыть"
+                            Style="{StaticResource TitleBarCloseButtonStyle}">
                         <TextBlock Text="✕" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Button>
                 </StackPanel>
@@ -74,15 +80,21 @@
 
         <!-- ── Main Content Area ── -->
         <Grid Grid.Row="1">
-            <!-- WebView2 Browser Component -->
-            <wpf:WebView2 x:Name="WebViewControl" Source="https://soundcloud.com" />
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-            <!-- Loading / Error Bar -->
-            <ProgressBar x:Name="WebProgressBar" Height="2" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Foreground="#FF5500" Visibility="Collapsed"/>
+            <!-- Column 0: WebView2 Browser Component & Loading Bar -->
+            <Grid Grid.Column="0">
+                <wpf:WebView2 x:Name="WebViewControl" Source="https://soundcloud.com" />
+                <ProgressBar x:Name="WebProgressBar" Height="2" VerticalAlignment="Top"
+                             Background="Transparent" BorderThickness="0" Foreground="#FF5500" Visibility="Collapsed"/>
+            </Grid>
 
-            <!-- ── Slide-Out Settings Side Panel ── -->
-            <Border x:Name="SettingsPanel" HorizontalAlignment="Right" Width="400" Background="#16181DF2"
-                    BorderBrush="#252A35" BorderThickness="1,0,0,0" Visibility="Collapsed" Panel.ZIndex="100">
+            <!-- Column 1: Slide-Out Settings Side Panel (Independent column: ZERO airspace overlap with WebView2) -->
+            <Border Grid.Column="1" x:Name="SettingsPanel" Width="400" Background="#16181D"
+                    BorderBrush="#252A35" BorderThickness="1,0,0,0" Visibility="Collapsed">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="20">
                         <!-- Panel Header -->
@@ -91,7 +103,10 @@
                                 <TextBlock Text="⚙️" FontSize="18" Margin="0,0,8,0"/>
                                 <TextBlock Text="Параметры DieCloud" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF"/>
                             </StackPanel>
-                            <Button Click="CloseSettings_Click" HorizontalAlignment="Right" Background="Transparent" BorderThickness="0" Foreground="#888" FontSize="16" Cursor="Hand" Content="✕"/>
+                            <Button Click="CloseSettings_Click" HorizontalAlignment="Right" ToolTip="Закрыть панель"
+                                    Style="{StaticResource PanelCloseButtonStyle}">
+                                <TextBlock Text="✕" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Button>
                         </Grid>
 
                         <!-- Section: Оформление -->
@@ -139,7 +154,7 @@
 
                                 <!-- Band Sliders -->
                                 <StackPanel x:Name="SlidersContainer">
-                                    <!-- Sliders will be programmatically bound or defined -->
+                                    <!-- Sliders are programmatically bound and defined -->
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -150,7 +165,8 @@
                             <StackPanel>
                                 <TextBlock Text="Конфигурация VLESS / Shadowsocks:" FontSize="11" Foreground="#8A92A6" Margin="0,0,0,4"/>
                                 <TextBox x:Name="TxtVpnUri" Background="#121418" Foreground="#FFF" BorderBrush="#343A46" Padding="8,5" FontSize="11" Margin="0,0,0,10"/>
-                                <Button x:Name="BtnToggleVpnAction" Click="BtnToggleVpnAction_Click" Content="Подключить VPN" Background="#28A745" Foreground="#FFF" FontWeight="SemiBold" Padding="10,6" BorderThickness="0" Cursor="Hand"/>
+                                <Button x:Name="BtnToggleVpnAction" Click="BtnToggleVpnAction_Click" Content="Подключить VPN"
+                                        Style="{StaticResource ModernPrimaryButtonStyle}" Padding="10,8"/>
                             </StackPanel>
                         </Border>
 
@@ -160,7 +176,7 @@
             </Border>
 
             <!-- ── CELEBRATORY GRAND OPENING WELCOME MODAL ── -->
-            <Border x:Name="WelcomeOverlay" Background="#E607080A" Visibility="Collapsed" Panel.ZIndex="200">
+            <Border Grid.ColumnSpan="2" x:Name="WelcomeOverlay" Background="#E607080A" Visibility="Collapsed" Panel.ZIndex="200" MouseDown="WelcomeOverlay_MouseDown">
                 <Border Background="#14161C" BorderBrush="#FF5500" BorderThickness="1.5" CornerRadius="16"
                         MaxWidth="640" MaxHeight="620" Margin="40" Padding="32" VerticalAlignment="Center" HorizontalAlignment="Center">
                     <StackPanel>
@@ -222,10 +238,10 @@
                         </Grid>
 
                         <!-- CTA Button -->
-                        <Button Click="StartListening_Click" Background="#FF5500" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
-                                Padding="20,12" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Center" Margin="0,0,0,12">
+                        <Button Click="StartListening_Click" Style="{StaticResource ModernPrimaryButtonStyle}"
+                                Padding="24,12" HorizontalAlignment="Center" Margin="0,0,0,14">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🚀 Начать слушать музыку" Margin="0,0,8,0"/>
+                                <TextBlock Text="🚀 Начать слушать музыку" FontSize="14" FontWeight="Bold"/>
                             </StackPanel>
                         </Button>
 

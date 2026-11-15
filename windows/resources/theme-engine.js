@@ -4,7 +4,7 @@
   // DieCloude 4.5.0 — theme engine
   // Тегирование + MutationObserver + один <style> + перехват Audio + громкость + горячие клавиши.
 
-  const initial = __SETTINGS__;
+  const initial = (typeof __SETTINGS__ !== 'undefined' && __SETTINGS__) ? __SETTINGS__ : {};
   const previous = window.__diecloudeThemeEngine;
   if (previous && typeof previous.destroy === 'function') previous.destroy();
 
@@ -1273,8 +1273,14 @@
 
   // ── Мост в приложение ────────────────────────────────────────────
   function post(type, payload) {
+    const msg = { type: type, ...payload };
     try {
-      window.webkit?.messageHandlers?.diecloudeBridge?.postMessage({ type: type, ...payload });
+      window.webkit?.messageHandlers?.diecloudeBridge?.postMessage(msg);
+    } catch (_) {}
+    try {
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage(msg);
+      }
     } catch (_) {}
   }
 
@@ -1811,6 +1817,9 @@
     if (b) { b.click(); setTimeout(maybePostMeta, 180); return true; }
     return false;
   };
+
+  state.nextTrack = state.next;
+  state.prevTrack = state.prev;
 
   state.seek = seconds => {
     const a = getActiveMedia();

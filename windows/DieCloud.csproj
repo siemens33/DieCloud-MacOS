@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <Resource Include="resources\DieCloudIcon.ico" />
+    <EmbeddedResource Include="resources\theme-engine.js" />
+    <EmbeddedResource Include="resources\adblock-rules.json" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>

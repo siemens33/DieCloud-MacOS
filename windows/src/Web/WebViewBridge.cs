@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using DieCloud.Models;
@@ -49,18 +48,51 @@ public sealed class WebViewBridge
         _coreWebView2.Settings.IsSwipeNavigationEnabled = true;
 
         // Inject theme-engine.js on every document creation
-        var scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "theme-engine.js");
-        if (File.Exists(scriptPath))
+        var script = LoadThemeEngineScript();
+        script = script.Replace("__SETTINGS__", _settings.ToBridgeJson());
+        await _coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(script);
+
+        // Synchronize settings upon navigation completed
+        _coreWebView2.NavigationCompleted += async (_, e) =>
         {
-            var script = await File.ReadAllTextAsync(scriptPath);
-            await _coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(script);
-        }
+            if (e.IsSuccess)
+            {
+                await PushAllSettingsAsync();
+            }
+        };
 
         // Setup AdBlock filter
         SetupAdBlock();
 
         // Listen for WebMessages from theme-engine.js
         _coreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
+    }
+
+    private static string LoadThemeEngineScript()
+    {
+        // 1. Try local file in resources/
+        var localPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "resources", "theme-engine.js");
+        if (File.Exists(localPath))
+        {
+            try { return File.ReadAllText(localPath); } catch { }
+        }
+
+        // 2. Try embedded resource
+        var asm = typeof(WebViewBridge).Assembly;
+        foreach (var resName in asm.GetManifestResourceNames())
+        {
+            if (resName.EndsWith("theme-engine.js", StringComparison.OrdinalIgnoreCase))
+            {
+                using var stream = asm.GetManifestResourceStream(resName);
+                if (stream != null)
+                {
+                    using var reader = new StreamReader(stream);
+                    return reader.ReadToEnd();
+                }
+            }
+        }
+
+        return "console.warn('DieCloud: theme-engine.js not found');";
     }
 
     private void SetupAdBlock()
@@ -88,12 +120,17 @@ public sealed class WebViewBridge
 
     private static bool IsAdUrl(string url)
     {
-        return url.Contains("doubleclick.net") ||
-               url.Contains("google-analytics.com") ||
-               url.Contains("scorecardresearch.com") ||
-               url.Contains("adnxs.com") ||
-               url.Contains("/ad/") ||
-               url.Contains("audio-ads");
+        var lower = url.ToLowerInvariant();
+        return lower.Contains("doubleclick.net") ||
+               lower.Contains("google-analytics.com") ||
+               lower.Contains("googlesyndication.com") ||
+               lower.Contains("googleadservices.com") ||
+               lower.Contains("scorecardresearch.com") ||
+               lower.Contains("amazon-adsystem.com") ||
+               lower.Contains("moatads.com") ||
+               lower.Contains("adnxs.com") ||
+               lower.Contains("/ad/") ||
+               lower.Contains("audio-ads");
     }
 
     private void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -107,27 +144,29 @@ public sealed class WebViewBridge
             if (!root.TryGetProperty("type", out var typeProp)) return;
             var type = typeProp.GetString();
 
-            if (type == "meta" && root.TryGetProperty("payload", out var payload))
+            var container = root.TryGetProperty("payload", out var p) ? p : root;
+
+            if (type == "meta")
             {
-                var title = payload.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
-                var artist = payload.TryGetProperty("artist", out var a) ? a.GetString() ?? "" : "";
-                var artwork = payload.TryGetProperty("artwork", out var art) ? art.GetString() ?? "" : "";
-                var trackURL = payload.TryGetProperty("trackURL", out var u) ? u.GetString() ?? "" : "";
+                var title = container.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
+                var artist = container.TryGetProperty("artist", out var a) ? a.GetString() ?? "" : "";
+                var artwork = container.TryGetProperty("artwork", out var art) ? art.GetString() ?? "" : "";
+                var trackURL = container.TryGetProperty("trackURL", out var u) ? u.GetString() ?? "" : "";
 
                 OnMetaReceived?.Invoke(title, artist, artwork, trackURL);
             }
-            else if (type == "state" && root.TryGetProperty("payload", out var statePayload))
+            else if (type == "state")
             {
-                bool playing = statePayload.TryGetProperty("playing", out var p) && p.GetBoolean();
-                double pos = statePayload.TryGetProperty("position", out var posVal) ? posVal.GetDouble() : 0;
-                double dur = statePayload.TryGetProperty("duration", out var durVal) ? durVal.GetDouble() : 0;
+                bool playing = container.TryGetProperty("playing", out var pVal) && pVal.GetBoolean();
+                double pos = container.TryGetProperty("position", out var posVal) ? posVal.GetDouble() : 0;
+                double dur = container.TryGetProperty("duration", out var durVal) ? durVal.GetDouble() : 0;
 
                 OnPlaybackStateReceived?.Invoke(playing, pos, dur);
             }
-            else if (type == "volume" && root.TryGetProperty("payload", out var volPayload))
+            else if (type == "volume")
             {
-                double vol = volPayload.TryGetProperty("volume", out var v) ? v.GetDouble() : 0.8;
-                bool muted = volPayload.TryGetProperty("muted", out var m) && m.GetBoolean();
+                double vol = container.TryGetProperty("volume", out var v) ? v.GetDouble() : 0.8;
+                bool muted = container.TryGetProperty("muted", out var m) && m.GetBoolean();
 
                 OnVolumeReceived?.Invoke(vol, muted);
             }
@@ -146,7 +185,7 @@ public sealed class WebViewBridge
     {
         if (_coreWebView2 == null) return;
         var json = _settings.ToBridgeJson();
-        await _coreWebView2.ExecuteScriptAsync($"window.__diecloude?.setAll({json});");
+        await _coreWebView2.ExecuteScriptAsync($"window.__diecloude?.setAll?.({json});");
     }
 
     public async Task ExecuteScriptAsync(string script)

@@ -49,6 +49,12 @@ public partial class MainWindow : Window
         if (!_settings.WelcomeShown)
         {
             WelcomeOverlay.Visibility = Visibility.Visible;
+            WebViewControl.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            WelcomeOverlay.Visibility = Visibility.Collapsed;
+            WebViewControl.Visibility = Visibility.Visible;
         }
 
         // Initialize SMTC
@@ -56,10 +62,10 @@ public partial class MainWindow : Window
         try
         {
             _smtc = new NowPlayingSMTC(hWnd);
-            _smtc.OnPlay += () => Dispatcher.Invoke(() => _bridge.ExecuteScriptAsync("window.__diecloude?.togglePlay();"));
-            _smtc.OnPause += () => Dispatcher.Invoke(() => _bridge.ExecuteScriptAsync("window.__diecloude?.togglePlay();"));
-            _smtc.OnNext += () => Dispatcher.Invoke(() => _bridge.ExecuteScriptAsync("window.__diecloude?.nextTrack();"));
-            _smtc.OnPrevious += () => Dispatcher.Invoke(() => _bridge.ExecuteScriptAsync("window.__diecloude?.prevTrack();"));
+            _smtc.OnPlay += () => Dispatcher.Invoke(() => _bridge.ExecuteScriptAsync("window.__diecloude?.togglePlay?.();"));
+            _smtc.OnPause += () => Dispatcher.Invoke(() => _bridge.ExecuteScriptAsync("window.__diecloude?.togglePlay?.();"));
+            _smtc.OnNext += () => Dispatcher.Invoke(() => _bridge.ExecuteScriptAsync("(window.__diecloude?.next || window.__diecloude?.nextTrack)?.();"));
+            _smtc.OnPrevious += () => Dispatcher.Invoke(() => _bridge.ExecuteScriptAsync("(window.__diecloude?.prev || window.__diecloude?.prevTrack)?.();"));
         }
         catch (Exception ex)
         {
@@ -72,6 +78,7 @@ public partial class MainWindow : Window
         {
             _xrayService.Start(_settings.VPNConfig);
         }
+        UpdateVpnUiState(_xrayService.IsRunning);
 
         WebProgressBar.Visibility = Visibility.Visible;
         try
@@ -276,20 +283,31 @@ public partial class MainWindow : Window
         {
             _xrayService.Stop();
             _settings.VPNEnabled = false;
-            BtnToggleVpnAction.Content = "Подключить VPN";
-            BtnToggleVpnAction.Background = new SolidColorBrush(Color.FromRgb(40, 167, 69));
+            UpdateVpnUiState(false);
         }
         else
         {
             bool ok = _xrayService.Start(_settings.VPNConfig);
             _settings.VPNEnabled = ok;
-            if (ok)
-            {
-                BtnToggleVpnAction.Content = "Отключить VPN";
-                BtnToggleVpnAction.Background = new SolidColorBrush(Color.FromRgb(220, 53, 69));
-            }
+            UpdateVpnUiState(ok);
         }
         _settings.Save();
+    }
+
+    private void UpdateVpnUiState(bool isRunning)
+    {
+        if (isRunning)
+        {
+            BtnToggleVpnAction.Content = "Отключить VPN";
+            BtnToggleVpnAction.Background = new SolidColorBrush(Color.FromRgb(220, 53, 69));
+            BtnVpn.Foreground = new SolidColorBrush(Color.FromRgb(40, 167, 69));
+        }
+        else
+        {
+            BtnToggleVpnAction.Content = "Подключить VPN";
+            BtnToggleVpnAction.Background = new SolidColorBrush(Color.FromRgb(40, 167, 69));
+            BtnVpn.Foreground = new SolidColorBrush(Color.FromRgb(160, 168, 186));
+        }
     }
     #endregion
 
@@ -341,15 +359,31 @@ public partial class MainWindow : Window
     {
         if (e.ChangedButton == MouseButton.Left)
         {
+            // Do not start drag if user clicked directly on any button
+            if (e.OriginalSource is DependencyObject dep && FindVisualParent<Button>(dep) != null)
+            {
+                return;
+            }
+
             if (e.ClickCount == 2)
             {
                 BtnMaximize_Click(sender, e);
             }
             else
             {
-                DragMove();
+                try { DragMove(); } catch { }
             }
         }
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
+    {
+        while (child != null)
+        {
+            if (child is T parent) return parent;
+            child = VisualTreeHelper.GetParent(child);
+        }
+        return null;
     }
 
     private void BtnMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -382,11 +416,22 @@ public partial class MainWindow : Window
     private void BtnVpn_Click(object sender, RoutedEventArgs e)
     {
         SettingsPanel.Visibility = Visibility.Visible;
+        TxtVpnUri.Focus();
+    }
+
+    private void WelcomeOverlay_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        // Dismiss if user clicks directly on the dark overlay background outside the card
+        if (e.OriginalSource == WelcomeOverlay)
+        {
+            StartListening_Click(sender, e);
+        }
     }
 
     private void StartListening_Click(object sender, RoutedEventArgs e)
     {
         WelcomeOverlay.Visibility = Visibility.Collapsed;
+        WebViewControl.Visibility = Visibility.Visible;
         _settings.WelcomeShown = ChkDontShowWelcome.IsChecked == true;
         _settings.Save();
     }
@@ -394,7 +439,11 @@ public partial class MainWindow : Window
     private void CloseAllOverlays()
     {
         SettingsPanel.Visibility = Visibility.Collapsed;
-        WelcomeOverlay.Visibility = Visibility.Collapsed;
+        if (WelcomeOverlay.Visibility == Visibility.Visible)
+        {
+            WelcomeOverlay.Visibility = Visibility.Collapsed;
+            WebViewControl.Visibility = Visibility.Visible;
+        }
     }
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -402,6 +451,14 @@ public partial class MainWindow : Window
         if (e.Key == Key.Escape)
         {
             CloseAllOverlays();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Enter && WelcomeOverlay.Visibility == Visibility.Visible)
+        {
+            StartListening_Click(sender, e);
+            e.Handled = true;
             return;
         }
 
@@ -410,17 +467,17 @@ public partial class MainWindow : Window
         {
             if (e.Key == Key.Up)
             {
-                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.changeVolume(0.05);");
+                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.changeVolume?.(0.05);");
                 e.Handled = true;
             }
             else if (e.Key == Key.Down)
             {
-                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.changeVolume(-0.05);");
+                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.changeVolume?.(-0.05);");
                 e.Handled = true;
             }
             else if (e.Key == Key.M)
             {
-                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.toggleMute();");
+                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.toggleMute?.();");
                 e.Handled = true;
             }
         }
@@ -428,17 +485,22 @@ public partial class MainWindow : Window
         {
             if (e.Key == Key.Left)
             {
-                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.prevTrack();");
+                _ = _bridge.ExecuteScriptAsync("(window.__diecloude?.prev || window.__diecloude?.prevTrack)?.();");
                 e.Handled = true;
             }
             else if (e.Key == Key.Right)
             {
-                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.nextTrack();");
+                _ = _bridge.ExecuteScriptAsync("(window.__diecloude?.next || window.__diecloude?.nextTrack)?.();");
                 e.Handled = true;
             }
             else if (e.Key == Key.P)
             {
-                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.togglePlay();");
+                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.togglePlay?.();");
+                e.Handled = true;
+            }
+            else if (e.Key == Key.L)
+            {
+                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.toggleLike?.();");
                 e.Handled = true;
             }
         }
