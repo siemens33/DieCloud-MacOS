@@ -19,6 +19,70 @@ final class SettingsState {
     /// Сохранённая громкость (0.0 ... 1.0) и состояние Mute.
     private(set) var volume: Double
     private(set) var isMuted: Bool
+    private(set) var equalizerEnabled: Bool
+    private(set) var equalizerBands: [Double]
+    private(set) var equalizerNormalization: Bool
+    static let defaultDiscordClientID = "1305221998971486258"
+    private static let discordClientIDKey = "DiscordClientID"
+
+    var customDiscordClientID: String {
+        get {
+            UserDefaults.standard.string(forKey: Self.discordClientIDKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        }
+        set {
+            let digits = newValue.trimmingCharacters(in: .whitespacesAndNewlines).filter(\.isNumber)
+            if digits.isEmpty || digits == Self.defaultDiscordClientID {
+                UserDefaults.standard.removeObject(forKey: Self.discordClientIDKey)
+            } else {
+                UserDefaults.standard.set(digits, forKey: Self.discordClientIDKey)
+            }
+        }
+    }
+
+    var discordClientID: String {
+        let custom = customDiscordClientID
+        return custom.isEmpty ? Self.defaultDiscordClientID : custom
+    }
+
+    static let equalizerFrequencies = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+    static let equalizerPresetKeys = ["flat", "bassBoost", "electronic", "rock", "vocal", "acoustic"]
+    static let equalizerPresetTitles = ["Ровно", "Басы", "Электронная", "Рок", "Вокал", "Акустика"]
+    static let equalizerPresets: [String: [Double]] = [
+        "flat": Array(repeating: 0, count: 10),
+        "bassBoost": [6, 5, 4, 3, 1, 0, 0, 0, 1, 2],
+        "electronic": [4, 3, 2, 0, -1, 2, 4, 3, 4, 5],
+        "rock": [4, 2, 1, -1, -2, 1, 3, 4, 4, 3],
+        "vocal": [-2, -1, 0, 2, 4, 4, 3, 1, 0, -1],
+        "acoustic": [2, 2, 1, 2, 3, 2, 1, 2, 3, 3]
+    ]
+    private static let equalizerEnabledKey = "equalizerEnabled"
+    private static let equalizerBandsKey = "equalizerBands"
+    private static let equalizerNormalizationKey = "equalizerNormalization"
+    var equalizerSliders: [NSSlider] = []
+    weak var equalizerPresetControl: NSPopUpButton?
+
+    func syncEqualizerControls() {
+        for slider in equalizerSliders where equalizerBands.indices.contains(slider.tag) {
+            slider.doubleValue = equalizerBands[slider.tag]
+        }
+        let index = Self.equalizerPresetKeys.firstIndex { Self.equalizerPresets[$0] == equalizerBands } ?? Self.equalizerPresetKeys.count - 1
+        equalizerPresetControl?.selectItem(at: index)
+    }
+
+    func setEqualizer(enabled: Bool? = nil, bands: [Double]? = nil, normalization: Bool? = nil) {
+        if let enabled {
+            equalizerEnabled = enabled
+            UserDefaults.standard.set(enabled, forKey: Self.equalizerEnabledKey)
+        }
+        if let normalization {
+            equalizerNormalization = normalization
+            UserDefaults.standard.set(normalization, forKey: Self.equalizerNormalizationKey)
+        }
+        if let bands, bands.count == Self.equalizerFrequencies.count, bands.allSatisfy(\.isFinite) {
+            equalizerBands = bands.map { max(-12, min(12, $0)) }
+            UserDefaults.standard.set(equalizerBands, forKey: Self.equalizerBandsKey)
+        }
+    }
 
     init() {
         let initial: [(key: String, jsKey: String, title: String, tooltip: String, defaultValue: Bool)] = [
@@ -33,7 +97,9 @@ final class SettingsState {
             (DefaultsKey.focus, "focus", "Режим фокуса — скрыть рекомендации",
              "Убирает сайдбар, комментарии и промо", false),
             (DefaultsKey.adBlock, "adBlock", "Режим без рекламы",
-             "Блокирует рекламные запросы, промо-треки и аудиопрероллы", true)
+             "Блокирует рекламные запросы, промо-треки и аудиопрероллы", true),
+            ("discordRPC", "discordRPC", "Discord Rich Presence",
+             "Показывать текущий трек в профиле Discord", false)
         ]
         flags = initial.map {
             Flag(key: $0.key, jsKey: $0.jsKey, title: $0.title, tooltip: $0.tooltip,
@@ -49,6 +115,14 @@ final class SettingsState {
             volume = 0.8
         }
         isMuted = defaults.bool(forKey: DefaultsKey.playerMuted)
+        equalizerEnabled = defaults.object(forKey: Self.equalizerEnabledKey) == nil ? false : defaults.bool(forKey: Self.equalizerEnabledKey)
+        equalizerNormalization = defaults.bool(forKey: Self.equalizerNormalizationKey)
+        let savedBands = (defaults.array(forKey: Self.equalizerBandsKey) as? [NSNumber])?.map(\.doubleValue)
+        if let savedBands, savedBands.count == Self.equalizerFrequencies.count, savedBands.allSatisfy(\.isFinite) {
+            equalizerBands = savedBands.map { max(-12, min(12, $0)) }
+        } else {
+            equalizerBands = Array(repeating: 0, count: Self.equalizerFrequencies.count)
+        }
 
         load()
     }
@@ -58,6 +132,9 @@ final class SettingsState {
         dict["accent"] = accent
         dict["volume"] = volume
         dict["isMuted"] = isMuted
+        dict["equalizerEnabled"] = equalizerEnabled
+        dict["equalizerBands"] = equalizerBands
+        dict["equalizerNormalization"] = equalizerNormalization
         if accent == "system" { dict["accentHex"] = NSColor.controlAccentColor.hexString }
         let data = (try? JSONSerialization.data(withJSONObject: dict)) ?? Data("{}".utf8)
         return String(data: data, encoding: .utf8) ?? "{}"

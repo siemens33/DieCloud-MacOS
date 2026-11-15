@@ -1,4 +1,4 @@
-name: Build macOS release
+name: Build release (macOS & Windows)
 
 on:
   push:
@@ -39,6 +39,10 @@ jobs:
           test -n "$DMG"
           cp "$DMG" build/DieCloude.dmg
           shasum -a 256 build/DieCloude.dmg > build/DieCloude.dmg.sha256
+          if [ -d "windows" ]; then
+            (cd windows && zip -r ../build/DieCloud-Windows.zip . -x '*.git*' -x '*bin*' -x '*obj*')
+            shasum -a 256 build/DieCloud-Windows.zip > build/DieCloud-Windows.zip.sha256
+          fi
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -48,7 +52,9 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             build/DieCloude.dmg \
             build/DieCloude.dmg.sha256 \
-            --title "DieCloude ${GITHUB_REF_NAME#v}" \
+            build/DieCloud-Windows.zip \
+            build/DieCloud-Windows.zip.sha256 \
+            --title "DieCloud ${GITHUB_REF_NAME#v} (Global Release)" \
             --notes-file RELEASE_NOTES.md \
             --latest \
             --verify-tag
@@ -56,7 +62,9 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DieCloude-macOS
+          name: DieCloud-Release-Assets
           path: |
             build/DieCloude.dmg
             build/DieCloude.dmg.sha256
+            build/DieCloud-Windows.zip
+            build/DieCloud-Windows.zip.sha256

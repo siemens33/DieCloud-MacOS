@@ -16,6 +16,8 @@ enum SettingsSidePanelBuilder {
         target: AnyObject,
         toggleAction: Selector,
         accentAction: Selector,
+        equalizerAction: Selector,
+        discordIdAction: Selector,
         openVPNAction: Selector,
         resetAction: Selector,
         checkUpdatesAction: Selector,
@@ -109,9 +111,10 @@ enum SettingsSidePanelBuilder {
         // Секция «Прослушивание»
         let listeningSpecs: [(key: String, symbol: String, color: NSColor)] = [
             ("focus", "eye.slash.fill", .systemPurple),
-            ("adBlock", "shield.lefthalf.filled", .systemGreen)
+            ("adBlock", "shield.lefthalf.filled", .systemGreen),
+            ("discordRPC", "bubble.left.and.bubble.right.fill", .systemIndigo)
         ]
-        let listeningRows: [NSView] = listeningSpecs.compactMap { spec in
+        var listeningRows: [NSView] = listeningSpecs.compactMap { spec in
             guard let sw = settings.makeSwitch(for: spec.key, action: toggleAction, target: target) else { return nil }
             let badge = iconBadge(symbol: spec.symbol, color: spec.color)
             return modernSettingsRow(
@@ -121,7 +124,66 @@ enum SettingsSidePanelBuilder {
                 control: sw
             )
         }
+
+        let discordIdField = NSTextField()
+        discordIdField.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        discordIdField.placeholderString = SettingsState.defaultDiscordClientID
+        discordIdField.stringValue = settings.customDiscordClientID
+        discordIdField.target = target
+        discordIdField.action = discordIdAction
+        (discordIdField.cell as? NSTextFieldCell)?.sendsActionOnEndEditing = true
+        discordIdField.translatesAutoresizingMaskIntoConstraints = false
+        discordIdField.widthAnchor.constraint(equalToConstant: 180).isActive = true
+        discordIdField.controlSize = .small
+        let discordIdRow = modernSettingsRow(
+            icon: iconBadge(symbol: "number", color: .systemIndigo),
+            title: "Discord Client ID",
+            subtitle: "Оставьте пустым для ID по умолчанию",
+            control: discordIdField
+        )
+        listeningRows.append(discordIdRow)
         let listeningCard = makeCard(rows: listeningRows)
+
+        let eqSwitch = NSSwitch()
+        eqSwitch.controlSize = .small
+        eqSwitch.state = settings.equalizerEnabled ? .on : .off
+        eqSwitch.target = target
+        eqSwitch.action = equalizerAction
+        eqSwitch.tag = -1
+        let eqRow = modernSettingsRow(icon: iconBadge(symbol: "slider.vertical.3", color: .systemOrange),
+                                     title: "Эквалайзер", subtitle: "10 полос · ±12 дБ · Автоматический CORS-роутинг", control: eqSwitch)
+        let normalization = NSSwitch()
+        normalization.controlSize = .small
+        normalization.state = settings.equalizerNormalization ? .on : .off
+        normalization.target = target
+        normalization.action = equalizerAction
+        normalization.tag = -2
+        let normalizationRow = modernSettingsRow(icon: iconBadge(symbol: "waveform", color: .systemOrange),
+                                                title: "Нормализация", subtitle: "Динамическое сжатие, не LUFS", control: normalization)
+        let presets = NSPopUpButton(frame: .zero, pullsDown: false)
+        presets.addItems(withTitles: SettingsState.equalizerPresetTitles + ["Вручную"])
+        presets.target = target
+        presets.action = equalizerAction
+        settings.equalizerPresetControl = presets
+        let presetRow = modernSettingsRow(icon: iconBadge(symbol: "slider.horizontal.3", color: .systemOrange),
+                                          title: "Пресет", subtitle: "Настройка частот", control: presets)
+        settings.equalizerSliders = []
+        let bandRows: [NSView] = SettingsState.equalizerFrequencies.enumerated().map { index, frequency in
+            let slider = NSSlider(value: settings.equalizerBands[index], minValue: -12, maxValue: 12,
+                                  target: target, action: equalizerAction)
+            slider.tag = index
+            settings.equalizerSliders.append(slider)
+            slider.isContinuous = true
+            slider.numberOfTickMarks = 7
+            slider.allowsTickMarkValuesOnly = false
+            slider.controlSize = .small
+            slider.toolTip = "\(frequency) Гц · \(String(format: "%.1f", slider.doubleValue)) дБ · −12…+12"
+            let label = frequency >= 1000 ? "\(Double(frequency) / 1000) кГц" : "\(frequency) Гц"
+            return modernSettingsRow(icon: iconBadge(symbol: "waveform", color: .systemOrange),
+                                     title: label, subtitle: "±12 дБ", control: slider)
+        }
+        settings.syncEqualizerControls()
+        let equalizerCard = makeCard(rows: [eqRow, normalizationRow, presetRow] + bandRows)
 
         // Секция «Система»
         let vpnBtn = NSButton(title: "Открыть…", target: target, action: openVPNAction)
@@ -170,6 +232,8 @@ enum SettingsSidePanelBuilder {
             accentCard,
             sectionTitle("Прослушивание"),
             listeningCard,
+            sectionTitle("Эквалайзер"),
+            equalizerCard,
             sectionTitle("Система"),
             actionsCard,
             footer
@@ -185,7 +249,7 @@ enum SettingsSidePanelBuilder {
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        for card in [designCard, accentCard, listeningCard, actionsCard, footer] as [NSView] {
+        for card in [designCard, accentCard, listeningCard, equalizerCard, actionsCard, footer] as [NSView] {
             card.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
         }
 

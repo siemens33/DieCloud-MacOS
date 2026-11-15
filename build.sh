@@ -76,6 +76,7 @@ rm -rf "$ICONSET"
 chmod 755 "$MACOS/DieCloude"
 chmod 755 "$RESOURCES/xray-arm64" "$RESOURCES/xray-x86_64"
 
+xattr -cr "$APP"
 codesign --force --deep --sign - "$APP"
 [[ -x "$MACOS/DieCloude" ]] || { echo "❌ Исполняемый файл не создан"; exit 1; }
 file "$MACOS/DieCloude"

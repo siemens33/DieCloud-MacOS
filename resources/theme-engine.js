@@ -1293,6 +1293,72 @@
   let applyingVolume = false;
   let volumeSyncTimer = 0;
 
+  // MediaElementSource cannot be created twice for the same element, even after teardown.
+  const eq = window.__diecloudeEqualizer || (window.__diecloudeEqualizer = {
+    context: null, graphs: new WeakMap(), elements: new Set()
+  });
+  const eqFrequencies = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
+  function updateEqualizer() {
+    const bands = Array.isArray(state.settings.equalizerBands) ? state.settings.equalizerBands : [];
+    for (const media of Array.from(eq.elements)) {
+      if (!media || (!document.contains(media) && media !== activeMedia && media.paused)) {
+        eq.elements.delete(media);
+        continue;
+      }
+      const graph = eq.graphs.get(media);
+      if (!graph) continue;
+      if (graph.compressor) {
+        graph.compressor.threshold.value = state.settings.equalizerNormalization ? -24 : 0;
+        graph.compressor.ratio.value = state.settings.equalizerNormalization ? 4 : 1;
+      }
+      graph.filters.forEach((filter, index) => {
+        const value = Number(bands[index]);
+        filter.gain.value = state.settings.equalizerEnabled && Number.isFinite(value)
+          ? Math.max(-12, Math.min(12, value)) : 0;
+      });
+    }
+  }
+
+  function attachEqualizer(media) {
+    if (!state.settings.equalizerEnabled || eq.graphs.has(media)) return;
+    try {
+      if (!media.crossOrigin) media.crossOrigin = 'anonymous';
+    } catch (_) {}
+    try {
+      const Context = window.AudioContext || window.webkitAudioContext;
+      if (!Context) return;
+      if (!eq.context) eq.context = new Context();
+      const compressor = eq.context.createDynamicsCompressor();
+      compressor.threshold.value = state.settings.equalizerNormalization ? -24 : 0;
+      compressor.knee.value = 18;
+      compressor.ratio.value = state.settings.equalizerNormalization ? 4 : 1;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+      const filters = eqFrequencies.map(frequency => {
+        const filter = eq.context.createBiquadFilter();
+        filter.type = 'peaking';
+        filter.frequency.value = frequency;
+        filter.Q.value = 1;
+        return filter;
+      });
+      for (let i = 0; i < filters.length - 1; i++) filters[i].connect(filters[i + 1]);
+      filters[filters.length - 1].connect(compressor);
+      compressor.connect(eq.context.destination);
+      const source = eq.context.createMediaElementSource(media);
+      source.connect(filters[0]);
+      eq.graphs.set(media, { source, filters, compressor });
+      eq.elements.add(media);
+      updateEqualizer();
+    } catch (error) {
+      console.warn('DieCloude equalizer unavailable:', error);
+    }
+  }
+
+  function resumeEqualizer() {
+    if (eq.context?.state === 'suspended') eq.context.resume().catch(() => {});
+  }
+
   function applyStoredVolumeToMedia(media) {
     if (!media) return;
     applyingVolume = true;
@@ -1350,14 +1416,24 @@
       artwork = styleBg?.[1] || img?.src || '';
       if (artwork) artwork = artwork.replace(/t\d+x\d+/, 't500x500');
     }
-    const title = (titleEl?.getAttribute('title') || titleEl?.textContent || '').trim();
-    const artist = (artistEl?.textContent || artistEl?.getAttribute('title') || '').trim();
-    return { title, artist, artwork };
+    const clean = value => String(value || '').replace(/^current\s*track\s*:\s*/i, '').replace(/\s+/g, ' ').trim();
+    const title = clean(titleEl?.getAttribute('title') || titleEl?.textContent);
+    const artist = clean(artistEl?.textContent || artistEl?.getAttribute('title'));
+    let trackURL = '';
+    try {
+      if (titleEl?.href) {
+        const url = new URL(titleEl.href);
+        if ((url.protocol === 'https:' || url.protocol === 'http:') &&
+            (url.hostname === 'soundcloud.com' || url.hostname.endsWith('.soundcloud.com')) &&
+            !url.username && !url.password) trackURL = url.href;
+      }
+    } catch (_) {}
+    return { title, artist, artwork, trackURL };
   }
 
   function maybePostMeta() {
     const meta = readMeta();
-    const key = meta.title + '|' + meta.artist + '|' + meta.artwork;
+    const key = meta.title + '|' + meta.artist + '|' + meta.artwork + '|' + meta.trackURL;
     if (!meta.title || key === nowPlaying.lastMetaKey) return;
     nowPlaying.lastMetaKey = key;
     post('meta', meta);
@@ -1365,6 +1441,7 @@
 
   function hookSingleAudio(a) {
     if (!a) return;
+    try { if (!a.crossOrigin) a.crossOrigin = 'anonymous'; } catch (_) {}
     trackedMedias.add(a);
     applyStoredVolumeToMedia(a);
     if (a.dataset?.dcHooked === '1' || a._dcHooked) return;
@@ -1372,6 +1449,8 @@
     a._dcHooked = true;
 
     const onPlay = () => {
+      attachEqualizer(a);
+      resumeEqualizer();
       activeMedia = a;
       applyStoredVolumeToMedia(a);
       postState(a);
@@ -1423,12 +1502,13 @@
     }
   }
 
-  // Одноразовый глобальный перехват HTMLMediaElement.play и new Audio() (для detached audio)
+  // Одноразовый глобальный перехват HTMLMediaElement, new Audio(), createElement('audio'), и src
   if (!window.__diecloudeAudioPatched) {
     window.__diecloudeAudioPatched = true;
     const origPlay = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function (...args) {
       try {
+        if (!this.crossOrigin) this.crossOrigin = 'anonymous';
         const eng = window.__diecloude;
         if (eng && typeof eng._onMediaPlay === 'function') eng._onMediaPlay(this);
       } catch (_) {}
@@ -1440,6 +1520,7 @@
       window.Audio = function (...args) {
         const inst = new OrigAudio(...args);
         try {
+          inst.crossOrigin = 'anonymous';
           const eng = window.__diecloude;
           if (eng && typeof eng._onAudioCreated === 'function') eng._onAudioCreated(inst);
         } catch (_) {}
@@ -1447,10 +1528,49 @@
       };
       window.Audio.prototype = OrigAudio.prototype;
     }
+
+    const origCreateElement = Document.prototype.createElement;
+    Document.prototype.createElement = function (tagName, options) {
+      const el = origCreateElement.call(this, tagName, options);
+      if (typeof tagName === 'string' && tagName.toLowerCase() === 'audio') {
+        try {
+          el.crossOrigin = 'anonymous';
+          const eng = window.__diecloude;
+          if (eng && typeof eng._onAudioCreated === 'function') eng._onAudioCreated(el);
+        } catch (_) {}
+      }
+      return el;
+    };
+
+    const srcDescriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
+    if (srcDescriptor && srcDescriptor.set) {
+      const origSrcSet = srcDescriptor.set;
+      Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+        ...srcDescriptor,
+        set(value) {
+          try {
+            if (!this.crossOrigin) this.crossOrigin = 'anonymous';
+          } catch (_) {}
+          return origSrcSet.call(this, value);
+        }
+      });
+    }
+
+    const origSetAttribute = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (name, value) {
+      if (this instanceof HTMLMediaElement && typeof name === 'string' && name.toLowerCase() === 'src') {
+        try {
+          if (!this.crossOrigin) this.crossOrigin = 'anonymous';
+        } catch (_) {}
+      }
+      return origSetAttribute.call(this, name, value);
+    };
   }
 
   state._onMediaPlay = (media) => {
     hookSingleAudio(media);
+    attachEqualizer(media);
+    resumeEqualizer();
     activeMedia = media;
     applyStoredVolumeToMedia(media);
   };
@@ -1636,10 +1756,20 @@
   // ── Публичный API window.__diecloude ─────────────────────────────
   state.set = (key, value) => {
     state.settings[key] = value;
+    if (key === 'equalizerEnabled' || key === 'equalizerBands' || key === 'equalizerNormalization') {
+      trackedMedias.forEach(attachEqualizer);
+      updateEqualizer();
+      if (state.settings.equalizerEnabled) resumeEqualizer();
+    }
     refresh(document);
   };
   state.setAll = values => {
     Object.assign(state.settings, values || {});
+    if ('equalizerEnabled' in (values || {}) || 'equalizerBands' in (values || {}) || 'equalizerNormalization' in (values || {})) {
+      trackedMedias.forEach(attachEqualizer);
+      updateEqualizer();
+      if (state.settings.equalizerEnabled) resumeEqualizer();
+    }
     if (typeof values?.volume === 'number' || typeof values?.isMuted === 'boolean') {
       persistVolumeLocal(state.settings.volume, state.settings.isMuted);
       trackedMedias.forEach(m => applyStoredVolumeToMedia(m));
@@ -1797,6 +1927,7 @@
     };
     window.addEventListener('scroll', state._scrollHandler, { passive: true });
 
+    updateEqualizer();
     refresh(document);
   }
 

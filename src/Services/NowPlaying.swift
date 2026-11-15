@@ -29,6 +29,9 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
     var onPlayerFound: (() -> Void)?
     var onVolumeChanged: ((Double?, Bool?) -> Void)?
     var onEscapePressed: (() -> Void)?
+    var onMetadataChanged: ((String, String) -> Void)?
+    var onPlaybackChanged: ((DiscordRPC.Playback) -> Void)?
+    private var discordPlayback = DiscordRPC.Playback()
 
     private var info: [String: Any] = [:]
     private var artworkTask: URLSessionDataTask?
@@ -86,6 +89,10 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
         let playing = body["playing"] as? Bool ?? false
         let position = body["position"] as? Double ?? 0
         let duration = body["duration"] as? Double ?? 0
+        discordPlayback.playing = playing
+        discordPlayback.position = position
+        discordPlayback.duration = duration
+        onPlaybackChanged?(discordPlayback)
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = position
         info[MPMediaItemPropertyPlaybackDuration] = duration
         info[MPNowPlayingInfoPropertyPlaybackRate] = playing ? 1.0 : 0.0
@@ -96,9 +103,15 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
     private func handleMeta(_ body: [String: Any]) {
         let title = body["title"] as? String ?? ""
         let artist = body["artist"] as? String ?? ""
+        onMetadataChanged?(title, artist)
         if !title.isEmpty { info[MPMediaItemPropertyTitle] = title }
         info[MPMediaItemPropertyArtist] = artist.isEmpty ? "SoundCloud" : artist
         let artwork = body["artwork"] as? String ?? ""
+        discordPlayback.title = title
+        discordPlayback.artist = artist
+        discordPlayback.artwork = artwork
+        discordPlayback.trackURL = body["trackURL"] as? String ?? ""
+        onPlaybackChanged?(discordPlayback)
         if artwork != artworkURLString {
             artworkURLString = artwork
             loadArtwork(from: artwork)

@@ -68,6 +68,10 @@ enum PlayerScripts {
         "window.__diecloude?.changeVolume(\(delta));"
     }
 
+    static func setVolume(_ value: Double) -> String {
+        "window.__diecloude?.setVolume(\(value));"
+    }
+
     static let toggleMute = "window.__diecloude?.toggleMute();"
 
     static let toggleLike = "window.__diecloude?.toggleLike();"

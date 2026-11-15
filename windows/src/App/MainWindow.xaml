@@ -1,0 +1,239 @@
+<Window x:Class="DieCloud.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wpf="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="DieCloud"
+        Height="780" Width="1200"
+        MinHeight="600" MinWidth="900"
+        WindowStyle="None"
+        AllowsTransparency="False"
+        Background="#0B0C0E"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid Background="#0B0C0E">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="46" /> <!-- Custom Title Bar -->
+            <RowDefinition Height="*" />  <!-- WebView2 & Overlays -->
+        </Grid.RowDefinitions>
+
+        <!-- ── Title Bar (Windows 11 Frameless Header) ── -->
+        <Border Grid.Row="0" Background="#121418" BorderBrush="#1F232B" BorderThickness="0,0,0,1" MouseDown="TitleBar_MouseDown">
+            <Grid Margin="14,0,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: Logo & Badges -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="pack://application:,,,/resources/DieCloudIcon.ico" Width="20" Height="20" Margin="0,0,10,0"/>
+                    <TextBlock Text="DieCloud" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <Border Background="#252A35" CornerRadius="4" Padding="6,2" Margin="0,0,12,0" VerticalAlignment="Center">
+                        <TextBlock Text="v5.0" FontSize="10" FontWeight="SemiBold" Foreground="#8A92A6"/>
+                    </Border>
+                    <TextBlock x:Name="StatusDot" Text="●" Foreground="#28A745" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock x:Name="StatusText" Text="SoundCloud Ready" FontSize="11" Foreground="#6C757D" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Center: Now Playing preview text -->
+                <TextBlock Grid.Column="1" x:Name="TitleNowPlaying" Text="Hear the tracks you love on SoundCloud"
+                           Foreground="#7C8497" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="500"/>
+
+                <!-- Right: Action Buttons & Window Controls -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- VPN Toggle Button -->
+                    <Button x:Name="BtnVpn" Click="BtnVpn_Click" Width="36" Height="32" Margin="0,0,4,0" ToolTip="Изолированный VPN (Xray)"
+                            Background="Transparent" BorderThickness="0" Foreground="#A0A8BA" Cursor="Hand">
+                        <TextBlock Text="🛡️" FontSize="13"/>
+                    </Button>
+
+                    <!-- Settings Button -->
+                    <Button x:Name="BtnSettings" Click="BtnSettings_Click" Width="36" Height="32" Margin="0,0,12,0" ToolTip="Настройки DieCloud"
+                            Background="Transparent" BorderThickness="0" Foreground="#A0A8BA" Cursor="Hand">
+                        <TextBlock Text="⚙️" FontSize="14"/>
+                    </Button>
+
+                    <!-- Minimize -->
+                    <Button Click="BtnMinimize_Click" Width="46" Height="46" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" Cursor="Hand">
+                        <TextBlock Text="─" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Button>
+
+                    <!-- Maximize/Restore -->
+                    <Button Click="BtnMaximize_Click" Width="46" Height="46" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" Cursor="Hand">
+                        <TextBlock x:Name="MaximizeIcon" Text="🗖" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Button>
+
+                    <!-- Close -->
+                    <Button Click="BtnClose_Click" Width="46" Height="46" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" Cursor="Hand" Style="{x:Null}">
+                        <TextBlock Text="✕" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ── Main Content Area ── -->
+        <Grid Grid.Row="1">
+            <!-- WebView2 Browser Component -->
+            <wpf:WebView2 x:Name="WebViewControl" Source="https://soundcloud.com" />
+
+            <!-- Loading / Error Bar -->
+            <ProgressBar x:Name="WebProgressBar" Height="2" VerticalAlignment="Top" Background="Transparent" BorderThickness="0" Foreground="#FF5500" Visibility="Collapsed"/>
+
+            <!-- ── Slide-Out Settings Side Panel ── -->
+            <Border x:Name="SettingsPanel" HorizontalAlignment="Right" Width="400" Background="#16181DF2"
+                    BorderBrush="#252A35" BorderThickness="1,0,0,0" Visibility="Collapsed" Panel.ZIndex="100">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20">
+                        <!-- Panel Header -->
+                        <Grid Margin="0,0,0,18">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="⚙️" FontSize="18" Margin="0,0,8,0"/>
+                                <TextBlock Text="Параметры DieCloud" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF"/>
+                            </StackPanel>
+                            <Button Click="CloseSettings_Click" HorizontalAlignment="Right" Background="Transparent" BorderThickness="0" Foreground="#888" FontSize="16" Cursor="Hand" Content="✕"/>
+                        </Grid>
+
+                        <!-- Section: Оформление -->
+                        <TextBlock Text="ОФОРМЛЕНИЕ" FontSize="11" FontWeight="Bold" Foreground="#6C757D" Margin="0,0,0,8"/>
+                        <Border Background="#1E2129" CornerRadius="8" Padding="14" Margin="0,0,0,16">
+                            <StackPanel>
+                                <CheckBox x:Name="ChkModernDesign" Content="Минималистичный интерфейс" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
+                                <CheckBox x:Name="ChkTheme" Content="Белый фирменный акцент" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
+                                <CheckBox x:Name="ChkRoundedCards" Content="Скругление обложек треков" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
+                                <CheckBox x:Name="ChkArtworkHover" Content="Мягкий эффект при наведении" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Section: Прослушивание -->
+                        <TextBlock Text="ПРОСЛУШИВАНИЕ" FontSize="11" FontWeight="Bold" Foreground="#6C757D" Margin="0,0,0,8"/>
+                        <Border Background="#1E2129" CornerRadius="8" Padding="14" Margin="0,0,0,16">
+                            <StackPanel>
+                                <CheckBox x:Name="ChkFocus" Content="Режим фокуса (скрыть сайдбар)" IsChecked="False" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
+                                <CheckBox x:Name="ChkAdBlock" Content="Режим без рекламы (AdBlock)" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
+                                <CheckBox x:Name="ChkDiscordRPC" Content="Discord Rich Presence" IsChecked="False" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,12"/>
+
+                                <TextBlock Text="Discord Client ID (числовой):" FontSize="11" Foreground="#8A92A6" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtDiscordClientId" Background="#121418" Foreground="#FFF" BorderBrush="#343A46" Padding="8,5" FontSize="12" TextChanged="TxtDiscordClientId_TextChanged"/>
+                                <TextBlock Text="Оставьте пустым для ID по умолчанию" FontSize="10" Foreground="#5A6170" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Section: 10-полосный Эквалайзер -->
+                        <TextBlock Text="ЭКВАЛАЙЗЕР И АУДИО (CORS-ROUTED)" FontSize="11" FontWeight="Bold" Foreground="#6C757D" Margin="0,0,0,8"/>
+                        <Border Background="#1E2129" CornerRadius="8" Padding="14" Margin="0,0,0,16">
+                            <StackPanel>
+                                <CheckBox x:Name="ChkEqualizer" Content="Включить 10-полосный эквалайзер" IsChecked="False" Checked="EqualizerToggle_Changed" Unchecked="EqualizerToggle_Changed" Foreground="#FF9800" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                                <CheckBox x:Name="ChkNormalization" Content="Динамическая нормализация (Compressor)" IsChecked="False" Checked="EqualizerToggle_Changed" Unchecked="EqualizerToggle_Changed" Foreground="#FFF" Margin="0,0,0,12"/>
+
+                                <TextBlock Text="Пресет звучания:" FontSize="11" Foreground="#8A92A6" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="CmbPresets" SelectionChanged="CmbPresets_SelectionChanged" Background="#121418" Foreground="#FFF" Margin="0,0,0,14">
+                                    <ComboBoxItem Content="Ровно (Flat)" IsSelected="True"/>
+                                    <ComboBoxItem Content="Усиление басов (Bass Boost)"/>
+                                    <ComboBoxItem Content="Электронная (Electronic)"/>
+                                    <ComboBoxItem Content="Рок (Rock)"/>
+                                    <ComboBoxItem Content="Вокал (Vocal)"/>
+                                    <ComboBoxItem Content="Акустика (Acoustic)"/>
+                                    <ComboBoxItem Content="Вручную (Custom)"/>
+                                </ComboBox>
+
+                                <!-- Band Sliders -->
+                                <StackPanel x:Name="SlidersContainer">
+                                    <!-- Sliders will be programmatically bound or defined -->
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Section: VPN (Xray) -->
+                        <TextBlock Text="ИЗОЛИРОВАННЫЙ VPN (XRAY)" FontSize="11" FontWeight="Bold" Foreground="#6C757D" Margin="0,0,0,8"/>
+                        <Border Background="#1E2129" CornerRadius="8" Padding="14" Margin="0,0,0,20">
+                            <StackPanel>
+                                <TextBlock Text="Конфигурация VLESS / Shadowsocks:" FontSize="11" Foreground="#8A92A6" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtVpnUri" Background="#121418" Foreground="#FFF" BorderBrush="#343A46" Padding="8,5" FontSize="11" Margin="0,0,0,10"/>
+                                <Button x:Name="BtnToggleVpnAction" Click="BtnToggleVpnAction_Click" Content="Подключить VPN" Background="#28A745" Foreground="#FFF" FontWeight="SemiBold" Padding="10,6" BorderThickness="0" Cursor="Hand"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="DieCloud v5.0.0 (Windows Edition) · by siemens" FontSize="10" Foreground="#4A5260" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- ── CELEBRATORY GRAND OPENING WELCOME MODAL ── -->
+            <Border x:Name="WelcomeOverlay" Background="#E607080A" Visibility="Collapsed" Panel.ZIndex="200">
+                <Border Background="#14161C" BorderBrush="#FF5500" BorderThickness="1.5" CornerRadius="16"
+                        MaxWidth="640" MaxHeight="620" Margin="40" Padding="32" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <StackPanel>
+                        <!-- Top Banner / Badge -->
+                        <Border Background="#2A180E" BorderBrush="#FF5500" BorderThickness="1" CornerRadius="20" HorizontalAlignment="Center" Padding="14,4" Margin="0,0,0,16">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🎉" FontSize="12" Margin="0,0,6,0"/>
+                                <TextBlock Text="DIECLOUD 5.0 · ОФИЦИАЛЬНАЯ ПРЕМЬЕРА НА WINDOWS" FontSize="11" FontWeight="Bold" Foreground="#FF8833"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Headline -->
+                        <TextBlock Text="Добро пожаловать в DieCloud!" FontSize="26" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock Text="Мы выходим на новый уровень. Ваш любимый SoundCloud — теперь в нативном, безупречном исполнении для Windows 10 и 11."
+                                   FontSize="13" Foreground="#9BA2B0" TextWrapping="Wrap" TextAlignment="Center" LineHeight="20" Margin="0,0,0,24"/>
+
+                        <!-- 4 Highlights Cards -->
+                        <Grid Margin="0,0,0,24">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Feature 1 -->
+                            <Border Grid.Row="0" Grid.Column="0" Background="#1B1E26" CornerRadius="10" Padding="14" Margin="0,0,8,12">
+                                <StackPanel>
+                                    <TextBlock Text="⚡ Никакого Electron" FontWeight="Bold" Foreground="#FFF" FontSize="13" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Нативный WebView2 на движке Chromium — минимальный расход памяти и моментальный отклик." Foreground="#8A92A6" FontSize="11" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Feature 2 -->
+                            <Border Grid.Row="0" Grid.Column="1" Background="#1B1E26" CornerRadius="10" Padding="14" Margin="8,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="🎛️ 10-полосный эквалайзер" FontWeight="Bold" Foreground="#FF9800" FontSize="13" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Аппаратный Web Audio роутинг с CORS-инжекцией — чистый студийный звук на 100% треков." Foreground="#8A92A6" FontSize="11" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Feature 3 -->
+                            <Border Grid.Row="1" Grid.Column="0" Background="#1B1E26" CornerRadius="10" Padding="14" Margin="0,0,8,0">
+                                <StackPanel>
+                                    <TextBlock Text="💬 Discord Rich Presence" FontWeight="Bold" Foreground="#5865F2" FontSize="13" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Трансляция трека, исполнителя и обложки в статус Discord прямо из коробки." Foreground="#8A92A6" FontSize="11" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Feature 4 -->
+                            <Border Grid.Row="1" Grid.Column="1" Background="#1B1E26" CornerRadius="10" Padding="14" Margin="8,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="🛡️ Изолированный VPN" FontWeight="Bold" Foreground="#28A745" FontSize="13" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Встроенный Xray-core обходит блокировки только внутри DieCloud, не трогая систему." Foreground="#8A92A6" FontSize="11" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- CTA Button -->
+                        <Button Click="StartListening_Click" Background="#FF5500" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
+                                Padding="20,12" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Center" Margin="0,0,0,12">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🚀 Начать слушать музыку" Margin="0,0,8,0"/>
+                            </StackPanel>
+                        </Button>
+
+                        <CheckBox x:Name="ChkDontShowWelcome" Content="Больше не показывать это окно при запуске"
+                                  Foreground="#6C757D" FontSize="11" HorizontalAlignment="Center" IsChecked="True"/>
+                    </StackPanel>
+                </Border>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

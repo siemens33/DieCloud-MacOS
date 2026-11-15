@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private var vpnHealthTimer: Timer?
     private let settings = SettingsState()
     private let nowPlaying = NowPlayingController()
+    private let discordRPC = DiscordRPC()
 
     private lazy var themeEngineSource: String = Self.loadThemeEngineSource()
     private var isAppProxyEnabled = false
@@ -70,6 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             guard let self, self.panelVisible else { return }
             self.setPanelVisible(false)
         }
+        nowPlaying.onPlaybackChanged = { [weak self] playback in
+            self?.discordRPC.update(playback)
+        }
+        discordRPC.setClientID(settings.discordClientID)
+        discordRPC.setEnabled(settings.value(for: "discordRPC") == true)
         nowPlaying.enableRemoteCommands()
     }
 
@@ -221,6 +227,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             target: self,
             toggleAction: #selector(toggleFlag(_:)),
             accentAction: #selector(changeAccent(_:)),
+            equalizerAction: #selector(changeEqualizer(_:)),
+            discordIdAction: #selector(changeDiscordClientID(_:)),
             openVPNAction: #selector(openVPN(_:)),
             resetAction: #selector(resetDesignSettings(_:)),
             checkUpdatesAction: #selector(checkForUpdates(_:)),
@@ -380,8 +388,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             setAdBlockEnabled(on)
         } else {
             settings.setValue(on, for: jsKey)
+            if jsKey == "discordRPC" { discordRPC.setEnabled(on) }
             applySetting(jsKey, value: on)
         }
+    }
+
+    @objc private func changeEqualizer(_ sender: NSControl) {
+        if let toggle = sender as? NSSwitch {
+            if toggle.tag == -2 {
+                settings.setEqualizer(normalization: toggle.state == .on)
+            } else {
+                settings.setEqualizer(enabled: toggle.state == .on)
+            }
+        } else if let popup = sender as? NSPopUpButton {
+                let keys = SettingsState.equalizerPresetKeys
+            if keys.indices.contains(popup.indexOfSelectedItem),
+               let bands = SettingsState.equalizerPresets[keys[popup.indexOfSelectedItem]] {
+                settings.setEqualizer(bands: bands)
+            }
+        } else if let slider = sender as? NSSlider {
+            var bands = settings.equalizerBands
+            guard bands.indices.contains(slider.tag) else { return }
+            bands[slider.tag] = slider.doubleValue
+            settings.setEqualizer(bands: bands)
+        }
+        settings.syncEqualizerControls()
+        pushAllSettings()
+    }
+
+    @objc private func changeDiscordClientID(_ sender: NSTextField) {
+        settings.customDiscordClientID = sender.stringValue
+        let effectiveID = settings.discordClientID
+        discordRPC.setClientID(effectiveID)
+        sender.stringValue = settings.customDiscordClientID
     }
 
     @objc private func resetDesignSettings(_ sender: Any?) {
@@ -689,6 +728,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         connectionRetryWorkItem?.cancel()
         vpnHealthTimer?.invalidate()
         vpnHealthTimer = nil
+        discordRPC.setEnabled(false)
         nowPlaying.disableRemoteCommands()
         nowPlaying.unregister()
         if isAppProxyEnabled {
