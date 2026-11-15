@@ -125,7 +125,17 @@ public sealed class XrayService : IDisposable
                 var user = uri.UserInfo;
                 var host = uri.Host;
                 var port = uri.Port;
-                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                var query = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (!string.IsNullOrEmpty(uri.Query))
+                {
+                    foreach (var part in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        var kv = part.Split('=', 2);
+                        query[Uri.UnescapeDataString(kv[0])] = kv.Length > 1 ? Uri.UnescapeDataString(kv[1]) : "";
+                    }
+                }
+                string GetParam(string key, string fallback = "") =>
+                    query.TryGetValue(key, out var val) ? val : fallback;
 
                 var vnext = new JsonObject
                 {
@@ -136,27 +146,27 @@ public sealed class XrayService : IDisposable
                         new JsonObject
                         {
                             ["id"] = user,
-                            ["encryption"] = query["encryption"] ?? "none",
-                            ["flow"] = query["flow"] ?? ""
+                            ["encryption"] = GetParam("encryption", "none"),
+                            ["flow"] = GetParam("flow", "")
                         }
                     }
                 };
 
                 var streamSettings = new JsonObject
                 {
-                    ["network"] = query["type"] ?? "tcp",
-                    ["security"] = query["security"] ?? "none"
+                    ["network"] = GetParam("type", "tcp"),
+                    ["security"] = GetParam("security", "none")
                 };
 
-                if (query["security"] == "reality")
+                if (GetParam("security") == "reality")
                 {
                     streamSettings["realitySettings"] = new JsonObject
                     {
-                        ["publicKey"] = query["pbk"] ?? "",
-                        ["serverName"] = query["sni"] ?? "",
-                        ["fingerprint"] = query["fp"] ?? "chrome",
-                        ["shortId"] = query["sid"] ?? "",
-                        ["spiderX"] = query["spx"] ?? ""
+                        ["publicKey"] = GetParam("pbk", ""),
+                        ["serverName"] = GetParam("sni", ""),
+                        ["fingerprint"] = GetParam("fp", "chrome"),
+                        ["shortId"] = GetParam("sid", ""),
+                        ["spiderX"] = GetParam("spx", "")
                     };
                 }
 

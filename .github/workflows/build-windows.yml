@@ -1,0 +1,40 @@
+name: Build Windows Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build Windows executable
+        shell: pwsh
+        run: |
+          cd windows
+          .\build.ps1
+          cd ..
+          mkdir release-win
+          Copy-Item windows\build\DieCloud.exe release-win\DieCloud.exe
+          Compress-Archive -Path windows\build\DieCloud.exe, windows\README.md -DestinationPath release-win\DieCloud-Windows-Portable.zip -Force
+
+      - name: Upload binaries to Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = if ($env:GITHUB_REF -like "refs/tags/*") { $env:GITHUB_REF_NAME } else { "v5.0.0" }
+          gh release upload $tag release-win\DieCloud.exe release-win\DieCloud-Windows-Portable.zip --clobber
