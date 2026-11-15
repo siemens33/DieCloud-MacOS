@@ -27,6 +27,14 @@ public sealed class XrayService : IDisposable
 
     public bool IsRunning => _process is { HasExited: false };
     public string CurrentServerName { get; private set; } = "";
+    public bool IsXrayInstalled
+    {
+        get
+        {
+            LocateOrSetXrayPath();
+            return File.Exists(_xrayPath);
+        }
+    }
 
     public XrayService()
     {

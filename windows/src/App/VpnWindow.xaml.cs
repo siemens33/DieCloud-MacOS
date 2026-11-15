@@ -23,6 +23,15 @@ public partial class VpnWindow : Window
 
         InitializeComponent();
         Loaded += VpnWindow_Loaded;
+
+        PreviewKeyDown += (s, e) =>
+        {
+            if (e.Key == Key.Escape)
+            {
+                Hide();
+                e.Handled = true;
+            }
+        };
     }
 
     private void VpnWindow_Loaded(object sender, RoutedEventArgs e)
@@ -208,8 +217,20 @@ public partial class VpnWindow : Window
     {
         if (e.ChangedButton == MouseButton.Left)
         {
+            if (e.OriginalSource is DependencyObject d && FindVisualParent<System.Windows.Controls.Button>(d) != null) return;
             try { DragMove(); } catch { }
         }
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject child) where T : DependencyObject
+    {
+        var parent = VisualTreeHelper.GetParent(child);
+        while (parent != null)
+        {
+            if (parent is T typed) return typed;
+            parent = VisualTreeHelper.GetParent(parent);
+        }
+        return null;
     }
 
     private void BtnClose_Click(object sender, RoutedEventArgs e)

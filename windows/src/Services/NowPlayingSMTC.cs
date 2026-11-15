@@ -2,7 +2,7 @@ using System;
 
 namespace DieCloud.Services;
 
-public sealed class NowPlayingSMTC
+public sealed class NowPlayingSMTC : IDisposable
 {
     public event Action? OnPlay;
     public event Action? OnPause;
@@ -19,6 +19,10 @@ public sealed class NowPlayingSMTC
     }
 
     public void UpdateMetadata(string title, string artist, string artworkUrl)
+    {
+    }
+
+    public void Dispose()
     {
     }
 }

@@ -16,6 +16,8 @@ public sealed class WebViewBridge
     public event Action<bool, double, double>? OnPlaybackStateReceived;
     public event Action<double, bool>? OnVolumeReceived;
     public event Action? OnEscapeReceived;
+    public event Action? OnNavigationStarting;
+    public event Action<bool>? OnNavigationCompleted;
 
     public WebViewBridge(SettingsState settings)
     {
@@ -33,7 +35,7 @@ public sealed class WebViewBridge
         var extraArgs = "--no-sandbox --disable-features=Translate,RendererAppContainer";
         if (useProxy)
         {
-            extraArgs += " --proxy-server=socks5://127.0.0.1:10808";
+            extraArgs += $" --proxy-server=http://127.0.0.1:{Services.XrayService.LocalHttpPort}";
         }
         options.AdditionalBrowserArguments = extraArgs;
 
@@ -52,9 +54,16 @@ public sealed class WebViewBridge
         script = script.Replace("__SETTINGS__", _settings.ToBridgeJson());
         await _coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(script);
 
+        // Navigation events
+        _coreWebView2.NavigationStarting += (_, _) =>
+        {
+            OnNavigationStarting?.Invoke();
+        };
+
         // Synchronize settings upon navigation completed
         _coreWebView2.NavigationCompleted += async (_, e) =>
         {
+            OnNavigationCompleted?.Invoke(e.IsSuccess);
             if (e.IsSuccess)
             {
                 await PushAllSettingsAsync();

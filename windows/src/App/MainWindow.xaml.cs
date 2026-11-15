@@ -23,10 +23,12 @@ public partial class MainWindow : Window
     private readonly XrayService _xrayService;
     private readonly WebViewBridge _bridge;
     private readonly VpnWindow _vpnWindow;
+    private readonly UpdateManager _updateManager;
     private NowPlayingSMTC? _smtc;
     private readonly List<Slider> _bandSliders = new();
     private bool _isUpdatingSliders;
     private bool _isInitialized;
+    private bool _isProxyBoundToWebView;
 
     public MainWindow()
     {
@@ -35,6 +37,8 @@ public partial class MainWindow : Window
         _xrayService = new XrayService();
         _bridge = new WebViewBridge(_settings);
         _vpnWindow = new VpnWindow(_settings, _xrayService);
+        _updateManager = new UpdateManager();
+
         _vpnWindow.Owner = this;
         _vpnWindow.OnProxyStateChanged += VpnWindow_OnProxyStateChanged;
 
@@ -95,6 +99,27 @@ public partial class MainWindow : Window
                 }
             }
         }
+        else if (_xrayService.IsXrayInstalled && _xrayService.StartDirectMode())
+        {
+            // Start Xray in direct pass-through mode so WebView2 can always bind to 127.0.0.1:17890
+            // and switch to any VPN server at runtime without requiring an app restart!
+            useProxy = true;
+        }
+
+        _isProxyBoundToWebView = useProxy;
+
+        // Wire progress bar
+        _bridge.OnNavigationStarting += () => Dispatcher.Invoke(() =>
+        {
+            WebProgressBar.Visibility = Visibility.Visible;
+            WebProgressBar.IsIndeterminate = true;
+        });
+
+        _bridge.OnNavigationCompleted += (ok) => Dispatcher.Invoke(() =>
+        {
+            WebProgressBar.Visibility = Visibility.Collapsed;
+            WebProgressBar.IsIndeterminate = false;
+        });
 
         WebProgressBar.Visibility = Visibility.Visible;
         try
@@ -126,11 +151,15 @@ public partial class MainWindow : Window
         // Sync Toolbar buttons visual states
         UpdateAdBlockToolbarState(_settings.AdBlock);
         UpdateVpnToolbarState(_xrayService.IsRunning && _settings.VPNEnabled);
+
+        // Check for updates silently in the background after 4 seconds (matching macOS)
+        _ = Task.Delay(4000).ContinueWith(_ => Dispatcher.Invoke(() => _updateManager.CheckForUpdatesAsync(this, silentWhenCurrent: true)));
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         _discordRpc.Dispose();
+        _smtc?.Dispose();
         _xrayService.Dispose();
         _vpnWindow.Close();
     }
@@ -348,6 +377,16 @@ public partial class MainWindow : Window
     private void VpnWindow_OnProxyStateChanged(bool isConnected, string serverName)
     {
         UpdateVpnToolbarState(isConnected);
+        if (_isProxyBoundToWebView)
+        {
+            _ = _bridge.ExecuteScriptAsync("location.reload();");
+        }
+        else
+        {
+            MessageBox.Show(this,
+                "VPN активирован. Для применения прокси к встроенному браузеру, пожалуйста, перезапустите DieCloud (при следующем запуске прокси будет подключаться моментально без перезапусков).",
+                "DieCloud VPN", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private void UpdateVpnToolbarState(bool isConnected)
@@ -373,15 +412,7 @@ public partial class MainWindow : Window
 
     private void BtnCheckUpdates_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "https://github.com/siemens33/DieCloud-MacOS/releases",
-                UseShellExecute = true
-            });
-        }
-        catch { }
+        _ = _updateManager.CheckForUpdatesAsync(this, silentWhenCurrent: false);
     }
     #endregion
 
@@ -530,6 +561,50 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Hardware multimedia keys (Keyboards & Headsets)
+        if (e.Key == Key.MediaPlayPause)
+        {
+            _ = _bridge.ExecuteScriptAsync("window.__diecloude?.togglePlay?.();");
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.MediaNextTrack)
+        {
+            _ = _bridge.ExecuteScriptAsync("(window.__diecloude?.next || window.__diecloude?.nextTrack)?.();");
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.MediaPreviousTrack)
+        {
+            _ = _bridge.ExecuteScriptAsync("(window.__diecloude?.prev || window.__diecloude?.prevTrack)?.();");
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.MediaStop)
+        {
+            _ = _bridge.ExecuteScriptAsync("window.__diecloude?.togglePlay?.();");
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.VolumeMute)
+        {
+            _ = _bridge.ExecuteScriptAsync("window.__diecloude?.toggleMute?.();");
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.VolumeUp)
+        {
+            _ = _bridge.ExecuteScriptAsync("window.__diecloude?.changeVolume?.(0.05);");
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.VolumeDown)
+        {
+            _ = _bridge.ExecuteScriptAsync("window.__diecloude?.changeVolume?.(-0.05);");
+            e.Handled = true;
+            return;
+        }
+
         // Global hotkeys matching macOS
         if (Keyboard.Modifiers == ModifierKeys.Alt)
         {
@@ -569,6 +644,19 @@ public partial class MainWindow : Window
             else if (e.Key == Key.L)
             {
                 _ = _bridge.ExecuteScriptAsync("window.__diecloude?.toggleLike?.();");
+                e.Handled = true;
+            }
+        }
+        else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            if (e.Key == Key.Right)
+            {
+                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.seekBy?.(10);");
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Left)
+            {
+                _ = _bridge.ExecuteScriptAsync("window.__diecloude?.seekBy?.(-10);");
                 e.Handled = true;
             }
         }
