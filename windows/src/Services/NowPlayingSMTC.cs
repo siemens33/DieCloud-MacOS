@@ -20,7 +20,8 @@ public sealed class NowPlayingSMTC
     {
         try
         {
-            var interop = (ISystemMediaTransportControlsInterop)WindowsRuntimeSystemExtensions.GetActivationFactory<SystemMediaTransportControls>();
+            var interopGuid = typeof(ISystemMediaTransportControlsInterop).GUID;
+            var interop = (ISystemMediaTransportControlsInterop)WindowsRuntimeHelper.GetActivationFactory("Windows.Media.SystemMediaTransportControls", interopGuid);
             var guid = typeof(SystemMediaTransportControls).GUID;
             interop.GetForWindow(windowHandle, ref guid, out var rawSmtc);
             _smtc = (SystemMediaTransportControls)rawSmtc;
@@ -106,27 +107,10 @@ public sealed class NowPlayingSMTC
     }
 }
 
-internal static class WindowsRuntimeSystemExtensions
+internal static class WindowsRuntimeHelper
 {
-    public static object GetActivationFactory<T>()
-    {
-        var typeName = typeof(T).FullName!;
-        [System.Runtime.InteropServices.DllImport("api-ms-win-core-winrt-l1-1-0.dll", CallingConvention = System.Runtime.InteropServices.CallingConvention.StdCall)]
-        static extern int RoGetActivationFactory(IntPtr activatableClassId, [System.Runtime.InteropServices.In] ref Guid iid, [System.Runtime.InteropServices.Out] out object factory);
-
-        var hstr = CreateHString(typeName);
-        try
-        {
-            var guid = typeof(T).GUID;
-            int hr = RoGetActivationFactory(hstr, ref guid, out var factory);
-            if (hr != 0) throw new InvalidOperationException($"RoGetActivationFactory failed with HR {hr:X8}");
-            return factory;
-        }
-        finally
-        {
-            DeleteHString(hstr);
-        }
-    }
+    [System.Runtime.InteropServices.DllImport("api-ms-win-core-winrt-l1-1-0.dll", CallingConvention = System.Runtime.InteropServices.CallingConvention.StdCall)]
+    private static extern int RoGetActivationFactory(IntPtr activatableClassId, [System.Runtime.InteropServices.In] ref Guid iid, out IntPtr factory);
 
     [System.Runtime.InteropServices.DllImport("api-ms-win-core-winrt-string-l1-1-0.dll", CallingConvention = System.Runtime.InteropServices.CallingConvention.StdCall)]
     private static extern int WindowsCreateString([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string sourceString, int length, out IntPtr hstring);
@@ -134,14 +118,18 @@ internal static class WindowsRuntimeSystemExtensions
     [System.Runtime.InteropServices.DllImport("api-ms-win-core-winrt-string-l1-1-0.dll", CallingConvention = System.Runtime.InteropServices.CallingConvention.StdCall)]
     private static extern int WindowsDeleteString(IntPtr hstring);
 
-    private static IntPtr CreateHString(string s)
+    public static object GetActivationFactory(string typeName, Guid iid)
     {
-        WindowsCreateString(s, s.Length, out var hstr);
-        return hstr;
-    }
-
-    private static void DeleteHString(IntPtr hstr)
-    {
-        if (hstr != IntPtr.Zero) WindowsDeleteString(hstr);
+        WindowsCreateString(typeName, typeName.Length, out var hstr);
+        try
+        {
+            int hr = RoGetActivationFactory(hstr, ref iid, out var factoryPtr);
+            if (hr != 0) throw new InvalidOperationException($"RoGetActivationFactory failed with HR {hr:X8}");
+            return System.Runtime.InteropServices.Marshal.GetObjectForIUnknown(factoryPtr);
+        }
+        finally
+        {
+            if (hstr != IntPtr.Zero) WindowsDeleteString(hstr);
+        }
     }
 }
