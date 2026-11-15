@@ -29,15 +29,21 @@ public sealed class SettingsState
     public bool AdBlock { get; set; } = true;
     public bool DiscordRPC { get; set; } = false;
     public string DiscordClientID { get; set; } = DefaultDiscordClientID;
-    public string Accent { get; set; } = "mono";
+    public string Accent { get; set; } = "mono"; // mono, amber, blue, system
     public double Volume { get; set; } = 0.8;
     public bool IsMuted { get; set; } = false;
     public bool EqualizerEnabled { get; set; } = false;
     public bool EqualizerNormalization { get; set; } = false;
     public double[] EqualizerBands { get; set; } = new double[10];
     public bool WelcomeShown { get; set; } = false;
+
+    // VPN Properties matching macOS
     public bool VPNEnabled { get; set; } = false;
     public string VPNConfig { get; set; } = "";
+    public string VpnSubscriptionKey { get; set; } = "";
+    public string SelectedVpnServerUri { get; set; } = "";
+    public bool VpnAutoConnect { get; set; } = false;
+    public List<VPNServer> VpnServers { get; set; } = new();
 
     [JsonIgnore]
     public string EffectiveDiscordClientID
@@ -65,6 +71,7 @@ public sealed class SettingsState
                 {
                     if (loaded.EqualizerBands == null || loaded.EqualizerBands.Length != 10)
                         loaded.EqualizerBands = new double[10];
+                    loaded.VpnServers ??= new();
                     return loaded;
                 }
             }
@@ -91,6 +98,16 @@ public sealed class SettingsState
         {
             System.Diagnostics.Debug.WriteLine($"Error saving settings: {ex.Message}");
         }
+    }
+
+    public void ResetDesign()
+    {
+        ModernDesign = true;
+        Theme = true;
+        RoundedCards = true;
+        ArtworkHover = true;
+        Accent = "mono";
+        Save();
     }
 
     public string ToBridgeJson()

@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
@@ -19,6 +22,7 @@ public partial class MainWindow : Window
     private readonly DiscordRPC _discordRpc;
     private readonly XrayService _xrayService;
     private readonly WebViewBridge _bridge;
+    private readonly VpnWindow _vpnWindow;
     private NowPlayingSMTC? _smtc;
     private readonly List<Slider> _bandSliders = new();
     private bool _isUpdatingSliders;
@@ -30,6 +34,9 @@ public partial class MainWindow : Window
         _discordRpc = new DiscordRPC(_settings.EffectiveDiscordClientID);
         _xrayService = new XrayService();
         _bridge = new WebViewBridge(_settings);
+        _vpnWindow = new VpnWindow(_settings, _xrayService);
+        _vpnWindow.Owner = this;
+        _vpnWindow.OnProxyStateChanged += VpnWindow_OnProxyStateChanged;
 
         InitializeComponent();
         _isInitialized = true;
@@ -72,13 +79,22 @@ public partial class MainWindow : Window
             System.Diagnostics.Debug.WriteLine($"SMTC initialization warning: {ex.Message}");
         }
 
-        // Initialize WebView2 & Bridge
-        bool useProxy = _settings.VPNEnabled && !string.IsNullOrWhiteSpace(_settings.VPNConfig);
-        if (useProxy)
+        // Auto-connect to VPN on launch if enabled
+        bool useProxy = false;
+        if (_settings.VpnAutoConnect && !string.IsNullOrEmpty(_settings.SelectedVpnServerUri))
         {
-            _xrayService.Start(_settings.VPNConfig);
+            var server = _settings.VpnServers.FirstOrDefault(s => s.RawURI == _settings.SelectedVpnServerUri);
+            if (server != null)
+            {
+                bool ready = await _xrayService.EnsureXrayAvailableAsync();
+                if (ready && _xrayService.Start(server))
+                {
+                    _settings.VPNEnabled = true;
+                    useProxy = true;
+                    UpdateVpnToolbarState(true);
+                }
+            }
         }
-        UpdateVpnUiState(_xrayService.IsRunning);
 
         WebProgressBar.Visibility = Visibility.Visible;
         try
@@ -106,12 +122,17 @@ public partial class MainWindow : Window
 
         // Discord RPC enable state
         _discordRpc.SetEnabled(_settings.DiscordRPC);
+
+        // Sync Toolbar buttons visual states
+        UpdateAdBlockToolbarState(_settings.AdBlock);
+        UpdateVpnToolbarState(_xrayService.IsRunning && _settings.VPNEnabled);
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         _discordRpc.Dispose();
         _xrayService.Dispose();
+        _vpnWindow.Close();
     }
 
     private void EnableWindows11Mica()
@@ -147,7 +168,11 @@ public partial class MainWindow : Window
         TxtDiscordClientId.Text = _settings.DiscordClientID == SettingsState.DefaultDiscordClientID ? "" : _settings.DiscordClientID;
         ChkEqualizer.IsChecked = _settings.EqualizerEnabled;
         ChkNormalization.IsChecked = _settings.EqualizerNormalization;
-        TxtVpnUri.Text = _settings.VPNConfig;
+
+        RbAccentMono.IsChecked = _settings.Accent == "mono";
+        RbAccentAmber.IsChecked = _settings.Accent == "amber";
+        RbAccentBlue.IsChecked = _settings.Accent == "blue";
+
         _isInitialized = true;
     }
 
@@ -252,6 +277,17 @@ public partial class MainWindow : Window
         }
     }
 
+    private void AccentChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_isInitialized) return;
+        if (RbAccentAmber.IsChecked == true) _settings.Accent = "amber";
+        else if (RbAccentBlue.IsChecked == true) _settings.Accent = "blue";
+        else _settings.Accent = "mono";
+
+        _settings.Save();
+        _ = _bridge.PushAllSettingsAsync();
+    }
+
     private void SettingChanged(object sender, RoutedEventArgs e)
     {
         if (!_isInitialized) return;
@@ -263,6 +299,7 @@ public partial class MainWindow : Window
         _settings.AdBlock = ChkAdBlock.IsChecked == true;
         _settings.DiscordRPC = ChkDiscordRPC.IsChecked == true;
 
+        UpdateAdBlockToolbarState(_settings.AdBlock);
         _discordRpc.SetEnabled(_settings.DiscordRPC);
         _settings.Save();
         _ = _bridge.PushAllSettingsAsync();
@@ -276,38 +313,75 @@ public partial class MainWindow : Window
         _settings.Save();
     }
 
-    private void BtnToggleVpnAction_Click(object sender, RoutedEventArgs e)
+    private void BtnAdBlock_Click(object sender, RoutedEventArgs e)
     {
-        _settings.VPNConfig = TxtVpnUri.Text.Trim();
-        if (_xrayService.IsRunning)
-        {
-            _xrayService.Stop();
-            _settings.VPNEnabled = false;
-            UpdateVpnUiState(false);
-        }
-        else
-        {
-            bool ok = _xrayService.Start(_settings.VPNConfig);
-            _settings.VPNEnabled = ok;
-            UpdateVpnUiState(ok);
-        }
+        _settings.AdBlock = !_settings.AdBlock;
+        ChkAdBlock.IsChecked = _settings.AdBlock;
+        UpdateAdBlockToolbarState(_settings.AdBlock);
         _settings.Save();
+        _ = _bridge.PushAllSettingsAsync();
     }
 
-    private void UpdateVpnUiState(bool isRunning)
+    private void UpdateAdBlockToolbarState(bool isEnabled)
     {
-        if (isRunning)
+        if (isEnabled)
         {
-            BtnToggleVpnAction.Content = "Отключить VPN";
-            BtnToggleVpnAction.Background = new SolidColorBrush(Color.FromRgb(220, 53, 69));
-            BtnVpn.Foreground = new SolidColorBrush(Color.FromRgb(40, 167, 69));
+            BtnAdBlock.Foreground = new SolidColorBrush(Color.FromRgb(52, 199, 89)); // Green
+            IconAdBlock.Opacity = 1.0;
         }
         else
         {
-            BtnToggleVpnAction.Content = "Подключить VPN";
-            BtnToggleVpnAction.Background = new SolidColorBrush(Color.FromRgb(40, 167, 69));
-            BtnVpn.Foreground = new SolidColorBrush(Color.FromRgb(160, 168, 186));
+            BtnAdBlock.Foreground = new SolidColorBrush(Color.FromRgb(160, 168, 186));
+            IconAdBlock.Opacity = 0.45;
         }
+    }
+
+    private void BtnVpn_Click(object sender, RoutedEventArgs e) => OpenVpnWindow();
+    private void BtnOpenVpn_Click(object sender, RoutedEventArgs e) => OpenVpnWindow();
+
+    private void OpenVpnWindow()
+    {
+        _vpnWindow.Show();
+        _vpnWindow.Activate();
+    }
+
+    private void VpnWindow_OnProxyStateChanged(bool isConnected, string serverName)
+    {
+        UpdateVpnToolbarState(isConnected);
+    }
+
+    private void UpdateVpnToolbarState(bool isConnected)
+    {
+        if (isConnected)
+        {
+            BtnVpn.Foreground = new SolidColorBrush(Color.FromRgb(52, 199, 89)); // Green
+            IconVpn.Text = "🛡️";
+        }
+        else
+        {
+            BtnVpn.Foreground = new SolidColorBrush(Color.FromRgb(160, 168, 186));
+            IconVpn.Text = "🔒";
+        }
+    }
+
+    private void BtnResetDesign_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ResetDesign();
+        InitSettingsUI();
+        _ = _bridge.PushAllSettingsAsync();
+    }
+
+    private void BtnCheckUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://github.com/siemens33/DieCloud-MacOS/releases",
+                UseShellExecute = true
+            });
+        }
+        catch { }
     }
     #endregion
 
@@ -412,12 +486,6 @@ public partial class MainWindow : Window
     }
 
     private void CloseSettings_Click(object sender, RoutedEventArgs e) => SettingsPanel.Visibility = Visibility.Collapsed;
-
-    private void BtnVpn_Click(object sender, RoutedEventArgs e)
-    {
-        SettingsPanel.Visibility = Visibility.Visible;
-        TxtVpnUri.Focus();
-    }
 
     private void WelcomeOverlay_MouseDown(object sender, MouseButtonEventArgs e)
     {

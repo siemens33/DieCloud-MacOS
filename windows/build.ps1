@@ -28,6 +28,10 @@ if (-not (Test-Path $xrayExe)) {
 Write-Host "[INFO] Publishing DieCloud 5.0 (win-x64, Self-Contained)..." -ForegroundColor Green
 dotnet publish DieCloud.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o build\
 
+if (Test-Path $xrayExe) {
+    Copy-Item $xrayExe -Destination "build\xray.exe" -Force
+}
+
 Write-Host "`n========================================================" -ForegroundColor Cyan
 Write-Host " [SUCCESS] DieCloud 5.0 built: build\DieCloud.exe" -ForegroundColor Green
 Write-Host "========================================================" -ForegroundColor Cyan

@@ -29,6 +29,7 @@ jobs:
           cd ..
           mkdir release-win
           Copy-Item windows\build\DieCloud.exe release-win\DieCloud.exe
+          if (Test-Path windows\build\xray.exe) { Copy-Item windows\build\xray.exe release-win\xray.exe }
           Compress-Archive -Path windows\build\* -DestinationPath release-win\DieCloud-Windows-Portable.zip -Force
 
       - name: Upload binaries to Release
@@ -37,4 +38,6 @@ jobs:
         shell: pwsh
         run: |
           $tag = if ($env:GITHUB_REF -like "refs/tags/*") { $env:GITHUB_REF_NAME } else { "v5.0.0" }
-          gh release upload $tag release-win\DieCloud.exe release-win\DieCloud-Windows-Portable.zip --clobber
+          $files = @("release-win\DieCloud.exe", "release-win\DieCloud-Windows-Portable.zip")
+          if (Test-Path release-win\xray.exe) { $files += "release-win\xray.exe" }
+          gh release upload $tag $files --clobber

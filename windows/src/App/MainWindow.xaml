@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wpf="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="DieCloud"
-        Height="780" Width="1200"
-        MinHeight="600" MinWidth="900"
+        Height="800" Width="1240"
+        MinHeight="600" MinWidth="920"
         WindowStyle="None"
         AllowsTransparency="False"
         Background="#0B0C0E"
@@ -12,11 +12,11 @@
 
     <Grid Background="#0B0C0E">
         <Grid.RowDefinitions>
-            <RowDefinition Height="46" /> <!-- Custom Title Bar -->
-            <RowDefinition Height="*" />  <!-- WebView2 & Overlays -->
+            <RowDefinition Height="44" /> <!-- Custom Title Bar -->
+            <RowDefinition Height="*" />  <!-- WebView2 & Settings -->
         </Grid.RowDefinitions>
 
-        <!-- ── Title Bar (Windows 11 Frameless Header) ── -->
+        <!-- ── Title Bar (Windows 11 Frameless Header matching macOS) ── -->
         <Border Grid.Row="0" Background="#121418" BorderBrush="#1F232B" BorderThickness="0,0,0,1">
             <Grid Margin="14,0,0,0">
                 <Grid.ColumnDefinitions>
@@ -28,7 +28,7 @@
                 <!-- Left: Logo & Badges (Draggable area) -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                             Background="Transparent" MouseDown="TitleBar_MouseDown">
-                    <Image Source="pack://application:,,,/resources/DieCloudIcon.ico" Width="20" Height="20" Margin="0,0,10,0"/>
+                    <Image Source="pack://application:,,,/resources/DieCloudIcon.ico" Width="22" Height="22" Margin="0,0,10,0"/>
                     <TextBlock Text="DieCloud" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <Border Background="#252A35" CornerRadius="4" Padding="6,2" Margin="0,0,12,0" VerticalAlignment="Center">
                         <TextBlock Text="v5.0" FontSize="10" FontWeight="SemiBold" Foreground="#8A92A6"/>
@@ -40,37 +40,43 @@
                 <!-- Center: Now Playing preview text (Draggable area) -->
                 <Border Grid.Column="1" Background="Transparent" MouseDown="TitleBar_MouseDown" HorizontalAlignment="Stretch">
                     <TextBlock x:Name="TitleNowPlaying" Text="Hear the tracks you love on SoundCloud"
-                               Foreground="#7C8497" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="500"/>
+                               Foreground="#8A92A6" FontSize="12" FontWeight="Medium" HorizontalAlignment="Center" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="520"/>
                 </Border>
 
-                <!-- Right: Action Buttons & Window Controls (Direct button hits, not draggable) -->
+                <!-- Right: Action Buttons & Window Controls -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- VPN Toggle Button -->
-                    <Button x:Name="BtnVpn" Click="BtnVpn_Click" Width="36" Height="32" Margin="0,0,4,0" ToolTip="Изолированный VPN (Xray)"
+                    <!-- AdBlock Toolbar Button -->
+                    <Button x:Name="BtnAdBlock" Click="BtnAdBlock_Click" Width="36" Height="32" Margin="0,0,2,0" ToolTip="Режим без рекламы"
                             Style="{StaticResource TitleBarActionButtonStyle}">
-                        <TextBlock Text="🛡️" FontSize="13"/>
+                        <TextBlock x:Name="IconAdBlock" Text="🛡️" FontSize="13"/>
+                    </Button>
+
+                    <!-- VPN Toolbar Button -->
+                    <Button x:Name="BtnVpn" Click="BtnVpn_Click" Width="36" Height="32" Margin="0,0,2,0" ToolTip="VPN — только DieCloud"
+                            Style="{StaticResource TitleBarActionButtonStyle}">
+                        <TextBlock x:Name="IconVpn" Text="🔒" FontSize="13"/>
                     </Button>
 
                     <!-- Settings Button -->
-                    <Button x:Name="BtnSettings" Click="BtnSettings_Click" Width="36" Height="32" Margin="0,0,8,0" ToolTip="Настройки DieCloud"
+                    <Button x:Name="BtnSettings" Click="BtnSettings_Click" Width="36" Height="32" Margin="0,0,8,0" ToolTip="Настройки (Параметры DieCloud)"
                             Style="{StaticResource TitleBarActionButtonStyle}">
                         <TextBlock Text="⚙️" FontSize="14"/>
                     </Button>
 
                     <!-- Minimize -->
-                    <Button Click="BtnMinimize_Click" Width="46" Height="46" ToolTip="Свернуть"
+                    <Button Click="BtnMinimize_Click" Width="46" Height="44" ToolTip="Свернуть"
                             Style="{StaticResource TitleBarWindowButtonStyle}">
                         <TextBlock Text="─" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Button>
 
                     <!-- Maximize/Restore -->
-                    <Button Click="BtnMaximize_Click" Width="46" Height="46" ToolTip="Развернуть"
+                    <Button Click="BtnMaximize_Click" Width="46" Height="44" ToolTip="Развернуть"
                             Style="{StaticResource TitleBarWindowButtonStyle}">
                         <TextBlock x:Name="MaximizeIcon" Text="🗖" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Button>
 
                     <!-- Close -->
-                    <Button Click="BtnClose_Click" Width="46" Height="46" ToolTip="Закрыть"
+                    <Button Click="BtnClose_Click" Width="46" Height="44" ToolTip="Закрыть"
                             Style="{StaticResource TitleBarCloseButtonStyle}">
                         <TextBlock Text="✕" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Button>
@@ -92,85 +98,309 @@
                              Background="Transparent" BorderThickness="0" Foreground="#FF5500" Visibility="Collapsed"/>
             </Grid>
 
-            <!-- Column 1: Slide-Out Settings Side Panel (Independent column: ZERO airspace overlap with WebView2) -->
-            <Border Grid.Column="1" x:Name="SettingsPanel" Width="400" Background="#16181D"
+            <!-- Column 1: Slide-Out Settings Side Panel (Matching macOS SettingsSidePanel) -->
+            <Border Grid.Column="1" x:Name="SettingsPanel" Width="420" Background="#14161C"
                     BorderBrush="#252A35" BorderThickness="1,0,0,0" Visibility="Collapsed">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="20">
+                    <StackPanel Margin="20,18,20,24">
                         <!-- Panel Header -->
                         <Grid Margin="0,0,0,18">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="⚙️" FontSize="18" Margin="0,0,8,0"/>
-                                <TextBlock Text="Параметры DieCloud" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF"/>
+                                <Border Width="38" Height="38" CornerRadius="8" Background="#1E222B" Margin="0,0,12,0">
+                                    <Image Source="pack://application:,,,/resources/DieCloudIcon.ico" Width="26" Height="26" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="DieCloud" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,8,0"/>
+                                        <Border Background="#252A35" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                            <TextBlock Text="v5.0" FontSize="10" FontWeight="Bold" Foreground="#8A92A6"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="● Применяется сразу, без перезагрузки" FontSize="11" Foreground="#28A745" Margin="0,2,0,0"/>
+                                </StackPanel>
                             </StackPanel>
-                            <Button Click="CloseSettings_Click" HorizontalAlignment="Right" ToolTip="Закрыть панель"
+                            <Button Click="CloseSettings_Click" HorizontalAlignment="Right" ToolTip="Закрыть (Esc)"
                                     Style="{StaticResource PanelCloseButtonStyle}">
                                 <TextBlock Text="✕" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                             </Button>
                         </Grid>
 
                         <!-- Section: Оформление -->
-                        <TextBlock Text="ОФОРМЛЕНИЕ" FontSize="11" FontWeight="Bold" Foreground="#6C757D" Margin="0,0,0,8"/>
-                        <Border Background="#1E2129" CornerRadius="8" Padding="14" Margin="0,0,0,16">
+                        <TextBlock Text="ОФОРМЛЕНИЕ" FontSize="10" FontWeight="Bold" Foreground="#6C757D" Margin="4,0,0,8"/>
+                        <Border Background="#1A1D24" BorderBrush="#252A36" BorderThickness="1" CornerRadius="12" Padding="14,6" Margin="0,0,0,16">
                             <StackPanel>
-                                <CheckBox x:Name="ChkModernDesign" Content="Минималистичный интерфейс" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
-                                <CheckBox x:Name="ChkTheme" Content="Белый фирменный акцент" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
-                                <CheckBox x:Name="ChkRoundedCards" Content="Скругление обложек треков" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
-                                <CheckBox x:Name="ChkArtworkHover" Content="Мягкий эффект при наведении" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF"/>
+                                <!-- Row 1: modernDesign -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1A007AFF" Margin="0,0,10,0">
+                                            <TextBlock Text="✨" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Минималистичный интерфейс" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Тёмный матовый плеер и чистые карточки" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox x:Name="ChkModernDesign" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Style="{StaticResource ModernToggleSwitchStyle}" Checked="SettingChanged" Unchecked="SettingChanged"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
+
+                                <!-- Row 2: theme (White accent) -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1A5856D6" Margin="0,0,10,0">
+                                            <TextBlock Text="🛡️" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Белый фирменный акцент" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Кнопки и акценты — белый вместо оранжевого" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox x:Name="ChkTheme" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Style="{StaticResource ModernToggleSwitchStyle}" Checked="SettingChanged" Unchecked="SettingChanged"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
+
+                                <!-- Row 3: roundedCards -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1AFF2D55" Margin="0,0,10,0">
+                                            <TextBlock Text="🔲" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Аккуратное скругление обложек" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Скругляет обложки треков, альбомов и плейлистов" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox x:Name="ChkRoundedCards" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Style="{StaticResource ModernToggleSwitchStyle}" Checked="SettingChanged" Unchecked="SettingChanged"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
+
+                                <!-- Row 4: artworkHover -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1A5AC8FA" Margin="0,0,10,0">
+                                            <TextBlock Text="👆" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Мягкий эффект при наведении" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Слегка подсвечивает обложку трека" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox x:Name="ChkArtworkHover" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Style="{StaticResource ModernToggleSwitchStyle}" Checked="SettingChanged" Unchecked="SettingChanged"/>
+                                </Grid>
                             </StackPanel>
                         </Border>
 
-                        <!-- Section: Прослушивание -->
-                        <TextBlock Text="ПРОСЛУШИВАНИЕ" FontSize="11" FontWeight="Bold" Foreground="#6C757D" Margin="0,0,0,8"/>
-                        <Border Background="#1E2129" CornerRadius="8" Padding="14" Margin="0,0,0,16">
-                            <StackPanel>
-                                <CheckBox x:Name="ChkFocus" Content="Режим фокуса (скрыть сайдбар)" IsChecked="False" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
-                                <CheckBox x:Name="ChkAdBlock" Content="Режим без рекламы (AdBlock)" IsChecked="True" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,10"/>
-                                <CheckBox x:Name="ChkDiscordRPC" Content="Discord Rich Presence" IsChecked="False" Checked="SettingChanged" Unchecked="SettingChanged" Foreground="#FFF" Margin="0,0,0,12"/>
+                        <!-- Section: Цветовой акцент -->
+                        <TextBlock Text="ЦВЕТОВОЙ АКЦЕНТ" FontSize="10" FontWeight="Bold" Foreground="#6C757D" Margin="4,0,0,8"/>
+                        <Border Background="#1A1D24" BorderBrush="#252A36" BorderThickness="1" CornerRadius="12" Padding="14,10" Margin="0,0,0,16">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="28" Height="28" CornerRadius="7" Background="#1AAF52DE" Margin="0,0,10,0">
+                                        <TextBlock Text="🎨" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Цветовой акцент" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                        <TextBlock Text="Кнопки, шкала времени и звук" FontSize="11" Foreground="#8A92A6"/>
+                                    </StackPanel>
+                                </StackPanel>
 
-                                <TextBlock Text="Discord Client ID (числовой):" FontSize="11" Foreground="#8A92A6" Margin="0,0,0,4"/>
-                                <TextBox x:Name="TxtDiscordClientId" Background="#121418" Foreground="#FFF" BorderBrush="#343A46" Padding="8,5" FontSize="12" TextChanged="TxtDiscordClientId_TextChanged"/>
-                                <TextBlock Text="Оставьте пустым для ID по умолчанию" FontSize="10" Foreground="#5A6170" Margin="0,4,0,0"/>
+                                <!-- Accent Selector Buttons -->
+                                <Border HorizontalAlignment="Right" Background="#14161C" CornerRadius="8" Padding="2">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton x:Name="RbAccentMono" Content="Моно" IsChecked="True" Checked="AccentChanged" Style="{StaticResource AccentSegmentButtonStyle}"/>
+                                        <RadioButton x:Name="RbAccentAmber" Content="Янтарь" Checked="AccentChanged" Style="{StaticResource AccentSegmentButtonStyle}"/>
+                                        <RadioButton x:Name="RbAccentBlue" Content="Синий" Checked="AccentChanged" Style="{StaticResource AccentSegmentButtonStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- Section: Прослушивание -->
+                        <TextBlock Text="ПРОСЛУШИВАНИЕ" FontSize="10" FontWeight="Bold" Foreground="#6C757D" Margin="4,0,0,8"/>
+                        <Border Background="#1A1D24" BorderBrush="#252A36" BorderThickness="1" CornerRadius="12" Padding="14,6" Margin="0,0,0,16">
+                            <StackPanel>
+                                <!-- Focus -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1AAF52DE" Margin="0,0,10,0">
+                                            <TextBlock Text="👁️" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Режим фокуса" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Убирает сайдбар, комментарии и промо" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox x:Name="ChkFocus" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Style="{StaticResource ModernToggleSwitchStyle}" Checked="SettingChanged" Unchecked="SettingChanged"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
+
+                                <!-- AdBlock -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1A34C759" Margin="0,0,10,0">
+                                            <TextBlock Text="🛡️" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Режим без рекламы" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Блокирует рекламу, промо и прероллы" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox x:Name="ChkAdBlock" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Style="{StaticResource ModernToggleSwitchStyle}" Checked="SettingChanged" Unchecked="SettingChanged"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
+
+                                <!-- Discord RPC -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1A5856D6" Margin="0,0,10,0">
+                                            <TextBlock Text="💬" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Discord Rich Presence" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Показывать текущий трек в статусе Discord" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox x:Name="ChkDiscordRPC" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Style="{StaticResource ModernToggleSwitchStyle}" Checked="SettingChanged" Unchecked="SettingChanged"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
+
+                                <!-- Discord Client ID -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1A5856D6" Margin="0,0,10,0">
+                                            <TextBlock Text="#" FontSize="14" FontWeight="Bold" Foreground="#5856D6" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Discord Client ID" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Оставьте пустым для ID по умолчанию" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <TextBox x:Name="TxtDiscordClientId" Width="140" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                             Background="#14161C" Foreground="#FFF" BorderBrush="#2F3543" Padding="6,4" FontSize="11"
+                                             TextChanged="TxtDiscordClientId_TextChanged"/>
+                                </Grid>
                             </StackPanel>
                         </Border>
 
                         <!-- Section: 10-полосный Эквалайзер -->
-                        <TextBlock Text="ЭКВАЛАЙЗЕР И АУДИО (CORS-ROUTED)" FontSize="11" FontWeight="Bold" Foreground="#6C757D" Margin="0,0,0,8"/>
-                        <Border Background="#1E2129" CornerRadius="8" Padding="14" Margin="0,0,0,16">
+                        <TextBlock Text="ЭКВАЛАЙЗЕР И АУДИО" FontSize="10" FontWeight="Bold" Foreground="#6C757D" Margin="4,0,0,8"/>
+                        <Border Background="#1A1D24" BorderBrush="#252A36" BorderThickness="1" CornerRadius="12" Padding="14,10" Margin="0,0,0,16">
                             <StackPanel>
-                                <CheckBox x:Name="ChkEqualizer" Content="Включить 10-полосный эквалайзер" IsChecked="False" Checked="EqualizerToggle_Changed" Unchecked="EqualizerToggle_Changed" Foreground="#FF9800" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                                <CheckBox x:Name="ChkNormalization" Content="Динамическая нормализация (Compressor)" IsChecked="False" Checked="EqualizerToggle_Changed" Unchecked="EqualizerToggle_Changed" Foreground="#FFF" Margin="0,0,0,12"/>
+                                <!-- Equalizer Switch -->
+                                <Grid Margin="0,4,0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1AFF9500" Margin="0,0,10,0">
+                                            <TextBlock Text="🎛️" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Эквалайзер" FontSize="13" FontWeight="SemiBold" Foreground="#FF9500"/>
+                                            <TextBlock Text="10 полос · ±12 дБ · CORS-роутинг" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox x:Name="ChkEqualizer" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Style="{StaticResource ModernToggleSwitchStyle}" Checked="EqualizerToggle_Changed" Unchecked="EqualizerToggle_Changed"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
 
-                                <TextBlock Text="Пресет звучания:" FontSize="11" Foreground="#8A92A6" Margin="0,0,0,4"/>
-                                <ComboBox x:Name="CmbPresets" SelectionChanged="CmbPresets_SelectionChanged" Background="#121418" Foreground="#FFF" Margin="0,0,0,14">
-                                    <ComboBoxItem Content="Ровно (Flat)" IsSelected="True"/>
-                                    <ComboBoxItem Content="Усиление басов (Bass Boost)"/>
-                                    <ComboBoxItem Content="Электронная (Electronic)"/>
-                                    <ComboBoxItem Content="Рок (Rock)"/>
-                                    <ComboBoxItem Content="Вокал (Vocal)"/>
-                                    <ComboBoxItem Content="Акустика (Acoustic)"/>
-                                    <ComboBoxItem Content="Вручную (Custom)"/>
-                                </ComboBox>
+                                <!-- Normalization Switch -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1AFF9500" Margin="0,0,10,0">
+                                            <TextBlock Text="〰️" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Нормализация" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Динамическое сжатие, не LUFS" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox x:Name="ChkNormalization" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Style="{StaticResource ModernToggleSwitchStyle}" Checked="EqualizerToggle_Changed" Unchecked="EqualizerToggle_Changed"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
+
+                                <!-- Preset Selection -->
+                                <Grid Margin="0,8">
+                                    <TextBlock Text="Пресет звучания:" FontSize="12" Foreground="#8A92A6" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="CmbPresets" Width="160" HorizontalAlignment="Right"
+                                              SelectionChanged="CmbPresets_SelectionChanged" Background="#14161C" Foreground="#FFF">
+                                        <ComboBoxItem Content="Ровно (Flat)" IsSelected="True"/>
+                                        <ComboBoxItem Content="Басы (Bass Boost)"/>
+                                        <ComboBoxItem Content="Электронная (Electronic)"/>
+                                        <ComboBoxItem Content="Рок (Rock)"/>
+                                        <ComboBoxItem Content="Вокал (Vocal)"/>
+                                        <ComboBoxItem Content="Акустика (Acoustic)"/>
+                                        <ComboBoxItem Content="Вручную (Custom)"/>
+                                    </ComboBox>
+                                </Grid>
 
                                 <!-- Band Sliders -->
-                                <StackPanel x:Name="SlidersContainer">
-                                    <!-- Sliders are programmatically bound and defined -->
+                                <StackPanel x:Name="SlidersContainer" Margin="0,4,0,0">
+                                    <!-- Programmatically generated band sliders -->
                                 </StackPanel>
                             </StackPanel>
                         </Border>
 
-                        <!-- Section: VPN (Xray) -->
-                        <TextBlock Text="ИЗОЛИРОВАННЫЙ VPN (XRAY)" FontSize="11" FontWeight="Bold" Foreground="#6C757D" Margin="0,0,0,8"/>
-                        <Border Background="#1E2129" CornerRadius="8" Padding="14" Margin="0,0,0,20">
+                        <!-- Section: Система -->
+                        <TextBlock Text="СИСТЕМА" FontSize="10" FontWeight="Bold" Foreground="#6C757D" Margin="4,0,0,8"/>
+                        <Border Background="#1A1D24" BorderBrush="#252A36" BorderThickness="1" CornerRadius="12" Padding="14,6" Margin="0,0,0,20">
                             <StackPanel>
-                                <TextBlock Text="Конфигурация VLESS / Shadowsocks:" FontSize="11" Foreground="#8A92A6" Margin="0,0,0,4"/>
-                                <TextBox x:Name="TxtVpnUri" Background="#121418" Foreground="#FFF" BorderBrush="#343A46" Padding="8,5" FontSize="11" Margin="0,0,0,10"/>
-                                <Button x:Name="BtnToggleVpnAction" Click="BtnToggleVpnAction_Click" Content="Подключить VPN"
-                                        Style="{StaticResource ModernPrimaryButtonStyle}" Padding="10,8"/>
+                                <!-- VPN Button Row -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1A32ADE6" Margin="0,0,10,0">
+                                            <TextBlock Text="🛡️" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Встроенный VPN" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Действует только на DieCloud" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Button Click="BtnOpenVpn_Click" Content="Открыть…" HorizontalAlignment="Right"
+                                            Style="{StaticResource TitleBarActionButtonStyle}" Padding="12,5" Width="Auto" Height="28"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
+
+                                <!-- Reset Design Row -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1AFFCC00" Margin="0,0,10,0">
+                                            <TextBlock Text="🔄" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Сбросить оформление" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Вернуть параметры по умолчанию" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Button Click="BtnResetDesign_Click" Content="Сбросить" HorizontalAlignment="Right"
+                                            Style="{StaticResource TitleBarActionButtonStyle}" Padding="12,5" Width="Auto" Height="28"/>
+                                </Grid>
+                                <Border Height="1" Background="#222631"/>
+
+                                <!-- Check Updates Row -->
+                                <Grid Margin="0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Width="28" Height="28" CornerRadius="7" Background="#1A007AFF" Margin="0,0,10,0">
+                                            <TextBlock Text="🔁" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Обновления" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                                            <TextBlock Text="Проверить новую версию на GitHub" FontSize="11" Foreground="#8A92A6"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Button Click="BtnCheckUpdates_Click" Content="Проверить…" HorizontalAlignment="Right"
+                                            Style="{StaticResource TitleBarActionButtonStyle}" Padding="12,5" Width="Auto" Height="28"/>
+                                </Grid>
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="DieCloud v5.0.0 (Windows Edition) · by siemens" FontSize="10" Foreground="#4A5260" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Версия 5.0 (Windows Edition) · siemens" FontSize="11" Foreground="#4A5260" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
