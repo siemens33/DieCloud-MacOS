@@ -22,15 +22,17 @@ public partial class MainWindow : Window
     private NowPlayingSMTC? _smtc;
     private readonly List<Slider> _bandSliders = new();
     private bool _isUpdatingSliders;
+    private bool _isInitialized;
 
     public MainWindow()
     {
-        InitializeComponent();
-
         _settings = SettingsState.Load();
         _discordRpc = new DiscordRPC(_settings.EffectiveDiscordClientID);
         _xrayService = new XrayService();
         _bridge = new WebViewBridge(_settings);
+
+        InitializeComponent();
+        _isInitialized = true;
 
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
@@ -72,8 +74,22 @@ public partial class MainWindow : Window
         }
 
         WebProgressBar.Visibility = Visibility.Visible;
-        await _bridge.InitializeAsync(WebViewControl, useProxy);
-        WebProgressBar.Visibility = Visibility.Collapsed;
+        try
+        {
+            await _bridge.InitializeAsync(WebViewControl, useProxy);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Не удалось запустить компонент Microsoft Edge WebView2.\n\n" +
+                            "Если у вас Windows 10, убедитесь, что установлен Microsoft Edge WebView2 Runtime:\n" +
+                            "https://developer.microsoft.com/en-us/microsoft-edge/webview2/\n\n" +
+                            "Детали: " + ex.Message,
+                            "DieCloud", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            WebProgressBar.Visibility = Visibility.Collapsed;
+        }
 
         // Bridge event subscriptions
         _bridge.OnMetaReceived += Bridge_OnMetaReceived;
@@ -113,6 +129,7 @@ public partial class MainWindow : Window
     #region Settings UI Binding
     private void InitSettingsUI()
     {
+        _isInitialized = false;
         ChkModernDesign.IsChecked = _settings.ModernDesign;
         ChkTheme.IsChecked = _settings.Theme;
         ChkRoundedCards.IsChecked = _settings.RoundedCards;
@@ -124,6 +141,7 @@ public partial class MainWindow : Window
         ChkEqualizer.IsChecked = _settings.EqualizerEnabled;
         ChkNormalization.IsChecked = _settings.EqualizerNormalization;
         TxtVpnUri.Text = _settings.VPNConfig;
+        _isInitialized = true;
     }
 
     private void BuildEqualizerSliders()
@@ -188,7 +206,7 @@ public partial class MainWindow : Window
 
     private void Slider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_isUpdatingSliders || sender is not Slider slider) return;
+        if (!_isInitialized || _isUpdatingSliders || sender is not Slider slider) return;
         if (slider.Tag is (int index, TextBlock valText))
         {
             valText.Text = $"{e.NewValue:0} дБ";
@@ -200,6 +218,7 @@ public partial class MainWindow : Window
 
     private void EqualizerToggle_Changed(object sender, RoutedEventArgs e)
     {
+        if (!_isInitialized) return;
         _settings.EqualizerEnabled = ChkEqualizer.IsChecked == true;
         _settings.EqualizerNormalization = ChkNormalization.IsChecked == true;
         _settings.Save();
@@ -208,7 +227,7 @@ public partial class MainWindow : Window
 
     private void CmbPresets_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_bandSliders.Count == 0) return;
+        if (!_isInitialized || _bandSliders.Count == 0) return;
         string[] presetKeys = ["flat", "bassBoost", "electronic", "rock", "vocal", "acoustic"];
         int idx = CmbPresets.SelectedIndex;
         if (idx >= 0 && idx < presetKeys.Length)
@@ -228,6 +247,7 @@ public partial class MainWindow : Window
 
     private void SettingChanged(object sender, RoutedEventArgs e)
     {
+        if (!_isInitialized) return;
         _settings.ModernDesign = ChkModernDesign.IsChecked == true;
         _settings.Theme = ChkTheme.IsChecked == true;
         _settings.RoundedCards = ChkRoundedCards.IsChecked == true;
@@ -243,6 +263,7 @@ public partial class MainWindow : Window
 
     private void TxtDiscordClientId_TextChanged(object sender, TextChangedEventArgs e)
     {
+        if (!_isInitialized) return;
         _settings.DiscordClientID = TxtDiscordClientId.Text;
         _discordRpc.SetClientID(_settings.EffectiveDiscordClientID);
         _settings.Save();
