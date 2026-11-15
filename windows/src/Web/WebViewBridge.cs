@@ -31,10 +31,12 @@ public sealed class WebViewBridge
         Directory.CreateDirectory(userDataFolder);
 
         var options = new CoreWebView2EnvironmentOptions();
+        var extraArgs = "--no-sandbox --disable-features=Translate,RendererAppContainer";
         if (useProxy)
         {
-            options.AdditionalBrowserArguments = "--proxy-server=socks5://127.0.0.1:10808";
+            extraArgs += " --proxy-server=socks5://127.0.0.1:10808";
         }
+        options.AdditionalBrowserArguments = extraArgs;
 
         var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder, options);
         await webViewControl.EnsureCoreWebView2Async(env);

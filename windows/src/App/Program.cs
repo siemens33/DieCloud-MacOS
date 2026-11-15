@@ -1,6 +1,8 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Windows;
 
 namespace DieCloud;
 
@@ -11,22 +13,52 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        using var mutex = new Mutex(true, MutexName, out bool isNewInstance);
-        if (!isNewInstance)
+        AppDomain.CurrentDomain.UnhandledException += (s, e) =>
         {
-            // Activate existing instance
-            var hWnd = FindWindow(null, "DieCloud");
-            if (hWnd != IntPtr.Zero)
-            {
-                ShowWindow(hWnd, SW_RESTORE);
-                SetForegroundWindow(hWnd);
-            }
-            return;
-        }
+            LogCrash(e.ExceptionObject?.ToString() ?? "Unknown unhandled exception");
+        };
 
-        var app = new App();
-        app.InitializeComponent();
-        app.Run();
+        try
+        {
+            using var mutex = new Mutex(true, MutexName, out bool isNewInstance);
+            if (!isNewInstance)
+            {
+                var hWnd = FindWindow(null, "DieCloud");
+                if (hWnd != IntPtr.Zero)
+                {
+                    ShowWindow(hWnd, SW_RESTORE);
+                    SetForegroundWindow(hWnd);
+                }
+                return;
+            }
+
+            var app = new App();
+            app.DispatcherUnhandledException += (s, e) =>
+            {
+                LogCrash(e.Exception.ToString());
+                e.Handled = true;
+                MessageBox.Show("Ошибка запуска:\n" + e.Exception.Message, "DieCloud Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            };
+            app.InitializeComponent();
+            app.Run();
+        }
+        catch (Exception ex)
+        {
+            LogCrash(ex.ToString());
+            MessageBox.Show("Критическая ошибка запуска:\n" + ex.Message, "DieCloud Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static void LogCrash(string msg)
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DieCloud");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "crash.log"), $"[{DateTime.UtcNow:u}] {msg}\n\n");
+            File.AppendAllText("crash.log", $"[{DateTime.UtcNow:u}] {msg}\n\n");
+        }
+        catch { }
     }
 
     private const int SW_RESTORE = 9;
