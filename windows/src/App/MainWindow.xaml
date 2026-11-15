@@ -87,7 +87,7 @@
 
             <!-- Column 0: WebView2 Browser Component & Loading Bar -->
             <Grid Grid.Column="0">
-                <wpf:WebView2 x:Name="WebViewControl" Source="https://soundcloud.com" />
+                <wpf:WebView2 x:Name="WebViewControl" />
                 <ProgressBar x:Name="WebProgressBar" Height="2" VerticalAlignment="Top"
                              Background="Transparent" BorderThickness="0" Foreground="#FF5500" Visibility="Collapsed"/>
             </Grid>

@@ -66,6 +66,9 @@ public sealed class WebViewBridge
 
         // Listen for WebMessages from theme-engine.js
         _coreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
+
+        // Navigate to SoundCloud AFTER environment is fully initialized
+        webViewControl.Source = new Uri("https://soundcloud.com");
     }
 
     private static string LoadThemeEngineScript()
