@@ -11,6 +11,7 @@ public sealed class WebViewBridge
 {
     private CoreWebView2? _coreWebView2;
     private readonly SettingsState _settings;
+    private bool _initialized;
 
     public event Action<string, string, string, string>? OnMetaReceived;
     public event Action<bool, double, double>? OnPlaybackStateReceived;
@@ -26,23 +27,35 @@ public sealed class WebViewBridge
 
     public async Task InitializeAsync(Microsoft.Web.WebView2.Wpf.WebView2 webViewControl, bool useProxy)
     {
+        // Prevent double-initialization (e.g. if WPF already triggered EnsureCoreWebView2Async)
+        if (_initialized) return;
+        _initialized = true;
+
         var userDataFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DieCloud", "WebView2Data");
         Directory.CreateDirectory(userDataFolder);
 
-        var options = new CoreWebView2EnvironmentOptions();
-        var extraArgs = "--no-sandbox --disable-features=Translate,RendererAppContainer";
-        if (useProxy)
+        // If WebView2 is already initialized (by WPF internals), we cannot change the environment.
+        // In that case, re-use the existing CoreWebView2 and skip env creation.
+        if (webViewControl.CoreWebView2 != null)
         {
-            extraArgs += $" --proxy-server=http://127.0.0.1:{Services.XrayService.LocalHttpPort}";
+            _coreWebView2 = webViewControl.CoreWebView2;
         }
-        options.AdditionalBrowserArguments = extraArgs;
+        else
+        {
+            var options = new CoreWebView2EnvironmentOptions();
+            var extraArgs = "--no-sandbox --disable-features=Translate,RendererAppContainer";
+            if (useProxy)
+            {
+                extraArgs += $" --proxy-server=http://127.0.0.1:{Services.XrayService.LocalHttpPort}";
+            }
+            options.AdditionalBrowserArguments = extraArgs;
 
-        var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder, options);
-        await webViewControl.EnsureCoreWebView2Async(env);
-
-        _coreWebView2 = webViewControl.CoreWebView2;
+            var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder, options);
+            await webViewControl.EnsureCoreWebView2Async(env);
+            _coreWebView2 = webViewControl.CoreWebView2;
+        }
 
         // Configure settings
         _coreWebView2.Settings.IsStatusBarEnabled = false;

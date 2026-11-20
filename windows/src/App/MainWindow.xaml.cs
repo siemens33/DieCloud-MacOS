@@ -57,15 +57,14 @@ public partial class MainWindow : Window
         BuildEqualizerSliders();
 
         // Check first run / welcome banner
+        // WebViewControl always starts Collapsed (set in XAML); revealed post-init
         if (!_settings.WelcomeShown)
         {
             WelcomeOverlay.Visibility = Visibility.Visible;
-            WebViewControl.Visibility = Visibility.Collapsed;
         }
         else
         {
             WelcomeOverlay.Visibility = Visibility.Collapsed;
-            WebViewControl.Visibility = Visibility.Visible;
         }
 
         // Initialize SMTC
@@ -125,6 +124,10 @@ public partial class MainWindow : Window
         try
         {
             await _bridge.InitializeAsync(WebViewControl, useProxy);
+            // Show WebView only after successful init to prevent WPF auto-init race condition
+            if (_settings.WelcomeShown)
+                WebViewControl.Visibility = Visibility.Visible;
+            // else: Welcome overlay is active; StartListening_Click will reveal WebViewControl
         }
         catch (Exception ex)
         {
