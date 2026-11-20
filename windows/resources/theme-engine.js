@@ -1233,12 +1233,27 @@
     if (!state.settings.adBlock) return;
     try {
       for (const a of audioElements(scope)) {
+        // Protect active playing song from false positives
+        if (a === activeMedia && !a.paused) {
+          if (Number.isFinite(a.duration) && a.duration > 35) continue;
+        }
         const src = (a.currentSrc || a.src || '').toLowerCase();
-        if (a.hasAttribute('data-ad') ||
-            src.includes('advert') || src.includes('/ads/') || src.includes('promotion') ||
-            src.includes('preroll') || src.includes('doubleclick') || src.includes('adsrv')) {
-          try { a.muted = true; a.currentTime = (a.duration || 0); a.pause(); } catch (_) {}
-          a.remove();
+        const isAd = a.hasAttribute('data-ad') ||
+                     Boolean(a.closest?.('[class*="adBanner"], [class*="audioAd"], [data-testid*="ad-"]')) ||
+                     src.includes('doubleclick.net') ||
+                     src.includes('adsrv') ||
+                     src.includes('audio-ads') ||
+                     src.includes('ad_break');
+        if (isAd) {
+          try {
+            a.muted = true;
+            if (Number.isFinite(a.duration) && a.duration > 0) {
+              a.currentTime = a.duration;
+            } else {
+              a.pause();
+            }
+          } catch (_) {}
+          // NEVER call a.remove(), which corrupts SoundCloud's internal audio manager pool
         }
       }
     } catch (_) {}
@@ -1329,12 +1344,27 @@
   function attachEqualizer(media) {
     if (!state.settings.equalizerEnabled || eq.graphs.has(media)) return;
     try {
-      if (!media.crossOrigin) media.crossOrigin = 'anonymous';
+      if (!media.crossOrigin && !media.src && !media.currentSrc) {
+        media.crossOrigin = 'anonymous';
+      }
     } catch (_) {}
     try {
       const Context = window.AudioContext || window.webkitAudioContext;
       if (!Context) return;
-      if (!eq.context) eq.context = new Context();
+      if (!eq.context) {
+        eq.context = new Context();
+        eq.context.addEventListener('statechange', () => {
+          if (eq.context && eq.context.state === 'suspended') {
+            const active = getActiveMedia();
+            if (active && !active.paused) {
+              eq.context.resume().catch(() => {});
+            }
+          }
+        });
+      }
+      if (eq.context.state === 'suspended') {
+        eq.context.resume().catch(() => {});
+      }
       const compressor = eq.context.createDynamicsCompressor();
       compressor.threshold.value = state.settings.equalizerNormalization ? -24 : 0;
       compressor.knee.value = 18;
@@ -1362,7 +1392,9 @@
   }
 
   function resumeEqualizer() {
-    if (eq.context?.state === 'suspended') eq.context.resume().catch(() => {});
+    if (eq.context && eq.context.state === 'suspended') {
+      eq.context.resume().catch(() => {});
+    }
   }
 
   function applyStoredVolumeToMedia(media) {
@@ -1447,7 +1479,7 @@
 
   function hookSingleAudio(a) {
     if (!a) return;
-    try { if (!a.crossOrigin) a.crossOrigin = 'anonymous'; } catch (_) {}
+    try { if (!a.crossOrigin && !a.src && !a.currentSrc) a.crossOrigin = 'anonymous'; } catch (_) {}
     trackedMedias.add(a);
     applyStoredVolumeToMedia(a);
     if (a.dataset?.dcHooked === '1' || a._dcHooked) return;

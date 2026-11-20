@@ -111,11 +111,16 @@ public sealed class WebViewBridge
     {
         if (_coreWebView2 == null) return;
 
-        // Add filter to block typical audio / banner ad requests
-        _coreWebView2.AddWebResourceRequestedFilter("*ad*", CoreWebView2WebResourceContext.All);
+        // Specific ad-network filters to avoid intercepting legitimate SoundCloud media streams
         _coreWebView2.AddWebResourceRequestedFilter("*doubleclick.net*", CoreWebView2WebResourceContext.All);
         _coreWebView2.AddWebResourceRequestedFilter("*google-analytics.com*", CoreWebView2WebResourceContext.All);
+        _coreWebView2.AddWebResourceRequestedFilter("*googlesyndication.com*", CoreWebView2WebResourceContext.All);
+        _coreWebView2.AddWebResourceRequestedFilter("*googleadservices.com*", CoreWebView2WebResourceContext.All);
         _coreWebView2.AddWebResourceRequestedFilter("*scorecardresearch.com*", CoreWebView2WebResourceContext.All);
+        _coreWebView2.AddWebResourceRequestedFilter("*amazon-adsystem.com*", CoreWebView2WebResourceContext.All);
+        _coreWebView2.AddWebResourceRequestedFilter("*moatads.com*", CoreWebView2WebResourceContext.All);
+        _coreWebView2.AddWebResourceRequestedFilter("*adnxs.com*", CoreWebView2WebResourceContext.All);
+        _coreWebView2.AddWebResourceRequestedFilter("*ads.soundcloud.com*", CoreWebView2WebResourceContext.All);
 
         _coreWebView2.WebResourceRequested += (sender, args) =>
         {
@@ -133,6 +138,13 @@ public sealed class WebViewBridge
     private static bool IsAdUrl(string url)
     {
         var lower = url.ToLowerInvariant();
+
+        // Safeguard: Never block SoundCloud's media audio streams or API
+        if (lower.Contains(".sndcdn.com") || lower.Contains("api-v2.soundcloud.com/media"))
+        {
+            return false;
+        }
+
         return lower.Contains("doubleclick.net") ||
                lower.Contains("google-analytics.com") ||
                lower.Contains("googlesyndication.com") ||
@@ -141,8 +153,8 @@ public sealed class WebViewBridge
                lower.Contains("amazon-adsystem.com") ||
                lower.Contains("moatads.com") ||
                lower.Contains("adnxs.com") ||
-               lower.Contains("/ad/") ||
-               lower.Contains("audio-ads");
+               lower.Contains("ads.soundcloud.com") ||
+               lower.Contains("/audio-ads");
     }
 
     private void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)

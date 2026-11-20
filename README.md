@@ -1,112 +1,126 @@
-# DieCloud
+# DieCloud 5.0 (Global Release)
 
 <div align="center">
 
-**Версия 5.0.0 (Global Release) · Сборка 50 · macOS 14+**
+**Версия 5.0.0 · Dual-Platform (macOS 14+ & Windows 10/11)**
 
-*Флагманский нативный клиент SoundCloud для macOS. Быстрый, легковесный, без Electron.*
+*Флагманский нативный плеер SoundCloud для macOS и Windows. Быстрый, легковесный, без Electron.*
 
-[![Platform](https://img.shields.io/badge/Platform-macOS%2014%2B%20(Universal)-000000?logo=apple&logoColor=white)](https://github.com/siemens33/DieCloud-MacOS/releases/latest)
-[![Swift](https://img.shields.io/badge/Swift-5.10%20%7C%206.0-F05138?logo=swift&logoColor=white)](https://swift.org)
-[![WebKit](https://img.shields.io/badge/Engine-Native%20WebKit-007AFF)](https://developer.apple.com/documentation/webkit)
+[![Platform macOS](https://img.shields.io/badge/Platform-macOS%2014%2B%20(Universal)-000000?logo=apple&logoColor=white)](https://github.com/siemens33/DieCloud-MacOS/releases/latest)
+[![Platform Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11%20(.NET%208)-0078D6?logo=windows&logoColor=white)](https://github.com/siemens33/DieCloud-MacOS/releases/latest)
+[![Engine macOS](https://img.shields.io/badge/Engine-Native%20WebKit-007AFF)](https://developer.apple.com/documentation/webkit)
+[![Engine Windows](https://img.shields.io/badge/Engine-Edge%20WebView2%20(Chromium)-0078D6)](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 [![Audio](https://img.shields.io/badge/Audio-10--Band%20EQ%20%2B%20CORS-FF5500)](https://soundcloud.com)
+[![VPN](https://img.shields.io/badge/VPN-Xray--core%20(Isolated)-28A745)](https://github.com/XTLS/Xray-core)
 [![Discord](https://img.shields.io/badge/Discord-Rich%20Presence-5865F2?logo=discord&logoColor=white)](https://discord.com)
-[![Windows Edition](https://img.shields.io/badge/Windows-Available%20v5.0-0078D6?logo=windows&logoColor=white)](https://github.com/siemens33/DieCloud-MacOS)
 
-[**Скачать последнюю версию (DMG)**](https://github.com/siemens33/DieCloud-MacOS/releases/latest)
+[**Скачать релизы (DMG для macOS / Portable ZIP & EXE для Windows)**](https://github.com/siemens33/DieCloud-MacOS/releases/latest)
 
 </div>
 
 ---
 
-## О приложении
+## 🎧 О проекте DieCloud
 
-**DieCloud** — это быстрый и удобный плеер SoundCloud для macOS в отдельном окне. Никакого Electron и десятков открытых вкладок браузера — приложение написано нативно на Swift (WebKit), поэтому работает плавно, не съедает оперативную память и не греет ноутбук.
+**DieCloud** — это высокопроизводительный нативный десктопный клиент для **SoundCloud**. 
 
-С выходом **версии 5.0** проект становится глобальным: помимо версии для macOS, теперь представлена официальная нативная редакция для **Windows** на базе .NET 8 и WebView2!
-
----
-
-## Возможности
-
-- 🎨 **Минималистичный тёмный интерфейс**: глубокие тёмные оттенки поверх сайта, аккуратная полупрозрачная шапка из матового стекла (Liquid Glass) и скругление обложек треков.
-- 🎛️ **10-полосный эквалайзер и нормализация**: встроенная настройка частот (32 Гц — 16 кГц) с готовыми пресетами (*Басы, Рок, Электроника, Вокал*) и мягким компрессором, работающая со **100% треков** благодаря автоматическому CORS-роутингу аудиопотока.
-- 💬 **Интеграция с Discord Rich Presence**: отображение трека, исполнителя, обложки и ссылки в вашем статусе Discord прямо из коробки (ID встроен по умолчанию, с возможностью указать собственный Client ID прямо в настройках).
-- 🎵 **Интеграция с системой и Now Playing**: текущий трек с обложкой отображается в системном меню macOS, поддерживаются мультимедийные клавиши F7/F8/F9 и управление с наушников.
-- ⌨️ **Управление с клавиатуры**: пауза и запуск по нажатию `Пробел` (автоматически отключается в полях ввода), переключение треков (`⌘←` / `⌘→`) и регулировка громкости (`⌥↑` / `⌥↓`).
-- 🛡️ **Встроенный изолированный VPN (Xray)**: прокси работает только внутри DieCloud и не затрагивает остальные программы и систему. Поддерживаются протоколы VLESS, VMess, Trojan и Shadowsocks.
-- 🚫 **Режим без рекламы**: блокирует рекламные баннеры, убирает промо-карточки из ленты и глушит аудиопрероллы.
-- 🌈 **Выбор цветового акцента**: белый монохром, янтарный, синий или системный цвет акцента macOS.
-- 🔄 **Автообновление**: приложение само проверяет наличие новых релизов на GitHub.
+В отличие от стандартных веб-приложений на базе громоздкого **Electron**, DieCloud использует **системные движки рендеринга**:
+- На **macOS** — нативный **WebKit (`WKWebView`)** на чистом **Swift/AppKit**, потребляющий минимум памяти и не нагружающий батарею MacBook.
+- На **Windows** — **Microsoft Edge WebView2 (Chromium)** на базе **C# .NET 8 (WPF)** с аппаратным ускорением и эффектом **Windows 11 Mica**.
 
 ---
 
-## Что нового в 5.0.0 (Global Release)
+## 🚀 Архитектура и как всё устроено
 
-- 🌐 **Выход на мультиплатформенность**: анонсирована и подготовлена официальная нативная редакция **DieCloud для Windows** на базе .NET 8 и WebView2 с поддержкой эффектов Windows 11 Mica.
-- 🎚️ **Гарантированный эквалайзер (CORS-роутинг)**: полностью сняты ограничения Web Audio API. Внедрена автоматическая инжекция `crossOrigin = "anonymous"` при создании аудиопотоков, благодаря чему 10-полосный эквалайзер и компрессор работают на 100% треков SoundCloud.
-- 💬 **Discord Client ID в интерфейсе**: больше не нужно вводить команды в Терминале — кастомный Application ID теперь можно указать прямо в боковой панели настроек, а готовый дефолтный ID уже встроен. Переподключение сокета происходит на лету.
-- ⚡ **Оптимизация памяти и стабильности**: исправлены потенциальные утечки памяти от неактивных аудиопотоков при многочасовом воспроизведении, улучшена стабильность IPC-сокетов.
-
----
-
-## Установка
-
-1. Скачайте `DieCloude.dmg` со [страницы релизов](https://github.com/siemens33/DieCloud-MacOS/releases/latest).
-2. Откройте образ и перетащите `DieCloude.app` в папку **«Программы»**.
-3. При первом запуске запустите скрипт `Первый запуск DieCloude.command` из образа — он снимет карантин macOS (требуется один раз).
-
----
-
-## Discord Rich Presence
-
-DieCloud поддерживает трансляцию текущего трека в ваш профиль Discord. Для работы требуется запущенный настольный клиент Discord.
-
-- **Работает «из коробки»**: приложение уже сконфигурировано со встроенным идентификатором по умолчанию (`1305221998971486258`). Достаточно включить тумблер **Discord Rich Presence** в панели настроек и убедиться, что в настройках самого Discord включен пункт «Отображать текущую активность как статус».
-- **Свой Application ID**: если вы хотите использовать собственное приложение Discord (со своей иконкой и именем), создайте его в [Discord Developer Portal](https://discord.com/developers/applications) и укажите числовой **Application ID** в поле **«Discord Client ID»** в боковой панели настроек DieCloud — он применится сразу, без перезапуска и команд в Терминале. Чтобы вернуться к ID по умолчанию, просто оставьте поле пустым.
-
----
-
-## Горячие клавиши
-
-| Действие | Сочетание клавиш |
-|---|---|
-| **Пауза / Воспроизведение** | `Пробел` или `⌘P` |
-| **Следующий трек** | `⌘→` |
-| **Предыдущий трек** | `⌘←` |
-| **Громче / Тише** | `⌥↑` / `⌥↓` |
-| **Включить / Выключить звук** | `⌥M` |
-| **Назад / Вперёд по истории** | `⌘[` / `⌘]` |
-| **Обновить страницу** | `⌘R` |
-| **На главную (Discover)** | `⌘0` |
-| **Панель настроек** | `⌘,` |
-| **Закрыть панель** | `Esc` |
-
----
-
-## Структура проекта
-
-```text
-DieCloud-MacOS/
-├── src/
-│   ├── App/          # Жизненный цикл (AppDelegate, меню)
-│   ├── Models/       # Хранилище настроек (SettingsState)
-│   ├── Services/     # Discord RPC, Now Playing, VPN (Xray), AdBlock
-│   ├── UI/           # Стеклянная боковая панель настроек, кнопки
-│   ├── Web/          # Мост связи с WebKit (PlayerBridge)
-│   └── main.swift    # Точка входа в приложение
-├── resources/
-│   ├── theme-engine.js    # JS-движок стилизации, эквалайзера и CORS
-│   └── adblock-rules.json # Правила блокировки рекламы
-├── build.sh          # Сборка универсального бинарника (arm64 + x86_64)
-└── Info.plist        # Метаданные бандла macOS
 ```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        DieCloud Desktop Shell                          │
+├───────────────────────────────────┬────────────────────────────────────┤
+│         macOS (Swift/AppKit)      │       Windows (C# .NET 8 / WPF)    │
+│  • NSWindow (Liquid Glass/Mica)   │  • Frameless Window (DWM Mica/Dark)│
+│  • MPNowPlayingInfoCenter / Remote│  • SystemMediaTransportControls    │
+│  • AppKit Native Settings Panel   │  • Slide-Out XAML Settings Panel   │
+│  • Global Hotkeys & Native Menus  │  • Keyboard Shortcuts & Media Keys │
+├───────────────────────────────────┴────────────────────────────────────┤
+│                   Web Core & Injection Engine                          │
+│  • WKWebView (macOS) / Microsoft.Web.WebView2 (Windows)                │
+│  • theme-engine.js (автоматическая инъекция на создание документа)     │
+│    ├── 10-полосный эквалайзер Web Audio API (32 Гц - 16 кГц, ±12 дБ)  │
+│    ├── CORS-роутинг и динамический компрессор нормализации             │
+│    ├── AdBlock (умная фильтрация баннеров без нарушения аудиоплеера)   │
+│    ├── Современные стили (Минимализм, Скругление обложек, Темы)        │
+│    └── Двусторонний IPC-мост метаданных и управления воспроизведением  │
+├────────────────────────────────────────────────────────────────────────┤
+│                     Изолированные фоновые сервисы                      │
+│  • Xray-Core Service (Автономный VPN на порту 127.0.0.1:17890)        │
+│    (Трафик SoundCloud изолированно проксируется; система не затрагивается)│
+│  • Discord Rich Presence (Трансляция трека, автора и обложки в Discord)│
+│  • UpdateManager (Фоновая тихая проверка релизов через GitHub API)     │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1. Единый скриптовый слой (`theme-engine.js`)
+Скрипт автоматически внедряется при открытии страниц SoundCloud:
+- **Перехват звука и Web Audio API**: строит цепочку из 10 фильтров `BiquadFilterNode` и `DynamicsCompressorNode`. Автоматически поддерживает активность `AudioContext` даже при сворачивании окна или смене вкладок.
+- **Оформление**: применяет тёмный матовый стиль, скругляет карточки, убирает визуальный шум и промо-блоки.
+- **Синхронизация состояния**: отправляет метаданные (название, автор, обложка, ссылка, позиция и длительность) в нативную оболочку по IPC-каналу.
+
+### 2. Изолированный VPN (`XrayService`, порт `17890`)
+- Включает встроенный бинарник `xray-core`.
+- Запускает локальный HTTP/SOCKS5 прокси на `127.0.0.1:17890`.
+- Вся маршрутизация действует **исключительно на плеер DieCloud**, не затрагивая остальные программы, мессенджеры и браузеры на компьютере.
+- Поддерживает импорт конфигураций VLESS, VMess, Trojan и Shadowsocks.
+
+### 3. Интеграция с системой (Now Playing & SMTC)
+- **macOS**: полная интеграция с `MPNowPlayingInfoCenter` и `MPRemoteCommandCenter` — управление с клавиатуры Mac (F7/F8/F9) и Bluetooth-наушников.
+- **Windows**: поддержка `SystemMediaTransportControls` (SMTC) и аппаратных мультимедиа-клавиш Windows — трек отображается во всплывающем системном оверлее громкости Windows 10/11.
+
+### 4. Discord Rich Presence
+- Отображает текущий трек, исполнителя, альбомную обложку и таймкод в статусе вашего профиля Discord.
+- Позволяет указать собственный `Discord Client ID` прямо в интерфейсе настроек без перезапуска.
+
+---
+
+## ⌨️ Горячие клавиши
+
+| Действие | macOS | Windows |
+|---|---|---|
+| **Воспроизведение / Пауза** | `Пробел` или `⌘P` | `Пробел` или `Ctrl + P` / `MediaPlayPause` |
+| **Следующий трек** | `⌘→` | `Ctrl + →` / `MediaNext` |
+| **Предыдущий трек** | `⌘←` | `Ctrl + ←` / `MediaPrevious` |
+| **Перемотка на 10 сек** | `⌘⇧→` / `⌘⇧←` | `Ctrl + Shift + →` / `Ctrl + Shift + ←` |
+| **Громче / Тише** | `⌥↑` / `⌥↓` | `Alt + ↑` / `Alt + ↓` / `VolumeUp` / `VolumeDown` |
+| **Включить / Выключить звук** | `⌥M` | `Alt + M` / `VolumeMute` |
+| **Нравится (Лайк)** | `⌘L` | `Ctrl + L` |
+| **Открыть настройки** | `⌘,` | Кнопка ⚙️ в заголовке окна |
+| **Закрыть панель / оверлей** | `Esc` | `Esc` |
+
+---
+
+## 📦 Установка
+
+### Для macOS:
+1. Загрузите актуальный `DieCloude.dmg` со [страницы релизов](https://github.com/siemens33/DieCloud-MacOS/releases/latest).
+2. Перетащите `DieCloude.app` в папку **«Программы»**.
+3. При первом запуске выполните `Первый запуск DieCloude.command` для автоматического снятия карантина Gatekeeper.
+
+### Для Windows:
+1. Загрузите `DieCloud.exe` (инсталлятор) или `DieCloud-Windows-Portable.zip` со [страницы релизов](https://github.com/siemens33/DieCloud-MacOS/releases/latest).
+2. Распакуйте и запустите `DieCloud.exe`.
+3. *(Для Windows 10)* Убедитесь, что установлен [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (в Windows 11 он встроен в ОС).
+
+---
+
+## 💡 Идеи для будущих версий
+- [ ] **Mini-Player (PiP)**: плавающее компактное окно поверх всех окон с минималистичным управлением.
+- [ ] **Adaptive Accent**: адаптивный цвет кнопок и волны, автоматически подстраивающийся под преобладающий цвет обложки текущего трека.
+- [ ] **Аудио-визуализатор**: анимированный спектрограф Web Audio в шапке окна.
+- [ ] **Палитра быстрых команд (`Ctrl+K` / `⌘K`)**: мгновенный поиск музыки и переключение пресетов без мыши.
+- [ ] **Таймер сна**: автоматическая плавная остановка воспроизведения через заданное время.
 
 ---
 
 <div align="center">
-
-Ответы на частые вопросы — в [FAQ.md](FAQ.md). Полная история версий — в [CHANGELOG.md](CHANGELOG.md).
 
 by siemens · 2026
 
