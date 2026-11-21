@@ -27,15 +27,17 @@ enum PlayerScripts {
       if (window.__diecloude && typeof window.__diecloude.next === 'function') {
         return window.__diecloude.next();
       }
-      var b = document.querySelector('.skipControls__next');
-      if (!b) {
-        var all = document.querySelectorAll('button[aria-label]');
-        for (var i = 0; i < all.length; i++) {
-          if (/next|следующ/i.test(all[i].getAttribute('aria-label') || '')) { b = all[i]; break; }
-        }
+      var b = document.querySelector('.skipControls__next, button.playControls__next, button[title*="next" i], button[aria-label*="next" i], button[aria-label*="следующ" i]');
+      var ok = false;
+      if (b && !b.disabled) {
+        try { b.click(); ok = true; } catch(_) {}
+        try { b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); } catch(_) {}
       }
-      if (b) { b.click(); return true; }
-      return false;
+      try {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, which: 39, shiftKey: true, bubbles: true, cancelable: true }));
+        ok = true;
+      } catch(_) {}
+      return ok;
     })();
     """
 
@@ -44,15 +46,17 @@ enum PlayerScripts {
       if (window.__diecloude && typeof window.__diecloude.prev === 'function') {
         return window.__diecloude.prev();
       }
-      var b = document.querySelector('.skipControls__previous');
-      if (!b) {
-        var all = document.querySelectorAll('button[aria-label]');
-        for (var i = 0; i < all.length; i++) {
-          if (/previous|prev|предыдущ/i.test(all[i].getAttribute('aria-label') || '')) { b = all[i]; break; }
-        }
+      var b = document.querySelector('.skipControls__previous, button.playControls__previous, button[title*="prev" i], button[aria-label*="previous" i], button[aria-label*="предыдущ" i]');
+      var ok = false;
+      if (b && !b.disabled) {
+        try { b.click(); ok = true; } catch(_) {}
+        try { b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); } catch(_) {}
       }
-      if (b) { b.click(); return true; }
-      return false;
+      try {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37, which: 37, shiftKey: true, bubbles: true, cancelable: true }));
+        ok = true;
+      } catch(_) {}
+      return ok;
     })();
     """
 

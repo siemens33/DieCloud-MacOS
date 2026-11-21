@@ -218,7 +218,7 @@ final class DiscordRPC {
         socketIndex = (socketIndex + 1) % socketPaths.count
         let work = DispatchWorkItem { [weak self] in self?.connect() }
         retry = work
-        queue.asyncAfter(deadline: .now() + (socketIndex == 0 ? 5 : 0.2), execute: work)
+        queue.asyncAfter(deadline: .now() + (socketIndex == 0 ? 8 : 1.0), execute: work)
     }
 
     private func disconnect() {

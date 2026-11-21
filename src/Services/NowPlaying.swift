@@ -101,8 +101,20 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
     }
 
     private func handleMeta(_ body: [String: Any]) {
-        let title = body["title"] as? String ?? ""
-        let artist = body["artist"] as? String ?? ""
+        var title = (body["title"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if title.lowercased().hasPrefix("current track:") {
+            title = String(title.dropFirst("current track:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let half = title.count / 2
+        if half > 2 && title.prefix(half) == title.suffix(half) {
+            title = String(title.prefix(half))
+        }
+
+        var artist = (body["artist"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if artist.lowercased().hasPrefix("current track:") {
+            artist = String(artist.dropFirst("current track:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
         onMetadataChanged?(title, artist)
         if !title.isEmpty { info[MPMediaItemPropertyTitle] = title }
         info[MPMediaItemPropertyArtist] = artist.isEmpty ? "SoundCloud" : artist
@@ -117,16 +129,13 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
             loadArtwork(from: artwork)
         }
         publish()
+        enforceTrackCommands()
     }
 
     private func publish() {
         // Без трека системный плеер показывает пустую карточку — не публикуем.
         guard (info[MPMediaItemPropertyTitle] as? String)?.isEmpty == false, hasState else { return }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        enforceTrackCommands()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.enforceTrackCommands()
-        }
     }
 
     private func enforceTrackCommands() {

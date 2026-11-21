@@ -1458,8 +1458,38 @@
   }
 
   function readMeta() {
-    const titleEl = document.querySelector('.playbackSoundBadge__titleLink, .playbackSoundBadge__title');
-    const artistEl = document.querySelector('.playbackSoundBadge__artist, .playbackSoundBadge__lightLink');
+    let rawTitle = '';
+    const titleLink = document.querySelector('.playbackSoundBadge__titleLink');
+    if (titleLink) {
+      rawTitle = titleLink.getAttribute('title') || '';
+      if (!rawTitle) {
+        const span = titleLink.querySelector('span:not(.sc-visuallyhidden)') || titleLink.querySelector('span');
+        rawTitle = span?.textContent || titleLink.textContent || '';
+      }
+    }
+    if (!rawTitle) {
+      const titleEl = document.querySelector('.playbackSoundBadge__title');
+      rawTitle = titleEl?.getAttribute('title') || titleEl?.textContent || '';
+    }
+
+    const clean = value => {
+      let s = String(value || '').replace(/^current\s*track\s*:\s*/i, '').replace(/\s+/g, ' ').trim();
+      const half = Math.floor(s.length / 2);
+      if (half > 2 && s.slice(0, half) === s.slice(half)) {
+        s = s.slice(0, half);
+      }
+      return s;
+    };
+
+    const title = clean(rawTitle);
+
+    let rawArtist = '';
+    const artistLink = document.querySelector('.playbackSoundBadge__lightLink, .playbackSoundBadge__artist');
+    if (artistLink) {
+      rawArtist = artistLink.getAttribute('title') || artistLink.textContent || '';
+    }
+    const artist = clean(rawArtist);
+
     const artEl = document.querySelector('.playbackSoundBadge__avatar .image__full, .playbackSoundBadge__avatar .sc-artwork, .playbackSoundBadge__avatar');
     let artwork = '';
     if (artEl) {
@@ -1468,13 +1498,11 @@
       artwork = styleBg?.[1] || img?.src || '';
       if (artwork) artwork = artwork.replace(/t\d+x\d+/, 't500x500');
     }
-    const clean = value => String(value || '').replace(/^current\s*track\s*:\s*/i, '').replace(/\s+/g, ' ').trim();
-    const title = clean(titleEl?.getAttribute('title') || titleEl?.textContent);
-    const artist = clean(artistEl?.textContent || artistEl?.getAttribute('title'));
+
     let trackURL = '';
     try {
-      if (titleEl?.href) {
-        const url = new URL(titleEl.href);
+      if (titleLink?.href) {
+        const url = new URL(titleLink.href);
         if ((url.protocol === 'https:' || url.protocol === 'http:') &&
             (url.hostname === 'soundcloud.com' || url.hostname.endsWith('.soundcloud.com')) &&
             !url.username && !url.password) trackURL = url.href;
@@ -1483,52 +1511,36 @@
     return { title, artist, artwork, trackURL };
   }
 
-  // ── Перехват MediaSession (замена перемотки 15с на переключение треков) ──
+  // ── Нейтрализация MediaSession (блокировка перемотки 15с в WebKit / Alcove) ──
   function setupMediaSession() {
-    if (!('mediaSession' in navigator)) return;
     try {
-      if (!navigator.mediaSession._dcPatched) {
-        navigator.mediaSession._dcPatched = true;
-        const origSet = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
-        navigator.mediaSession._origSetActionHandler = origSet;
-        navigator.mediaSession.setActionHandler = (action, handler) => {
-          // Подавляем seekbackward и seekforward, которые вызывают появление кнопок перемотки 15с
-          // в Центре управления macOS и на экране блокировки вместо кнопок переключения треков
-          if (action === 'seekbackward' || action === 'seekforward') {
-            try { origSet(action, null); } catch (_) {}
-            return;
-          }
-          if (action === 'previoustrack') {
-            return origSet('previoustrack', () => {
-              if (state && typeof state.prev === 'function') state.prev();
-              else if (typeof handler === 'function') handler();
-            });
-          }
-          if (action === 'nexttrack') {
-            return origSet('nexttrack', () => {
-              if (state && typeof state.next === 'function') state.next();
-              else if (typeof handler === 'function') handler();
-            });
-          }
-          return origSet(action, handler);
+      if (!window.__dcMediaSessionNeutralized && 'mediaSession' in navigator) {
+        window.__dcMediaSessionNeutralized = true;
+        const dummy = {
+          metadata: null,
+          playbackState: 'none',
+          setActionHandler: (action, handler) => {
+            if (action === 'nexttrack' && typeof handler === 'function') state._scNext = handler;
+            if (action === 'previoustrack' && typeof handler === 'function') state._scPrev = handler;
+          },
+          setPositionState: () => {}
         };
+        try {
+          Object.defineProperty(navigator, 'mediaSession', {
+            get: () => dummy,
+            set: () => {},
+            configurable: false,
+            enumerable: true
+          });
+        } catch (_) {
+          try {
+            navigator.mediaSession.setActionHandler('seekbackward', null);
+            navigator.mediaSession.setActionHandler('seekforward', null);
+            navigator.mediaSession.setActionHandler('previoustrack', () => state.prev());
+            navigator.mediaSession.setActionHandler('nexttrack', () => state.next());
+          } catch (_) {}
+        }
       }
-
-      const orig = navigator.mediaSession._origSetActionHandler || navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
-      try { orig('seekbackward', null); } catch (_) {}
-      try { orig('seekforward', null); } catch (_) {}
-      orig('previoustrack', () => {
-        if (state && typeof state.prev === 'function') state.prev();
-      });
-      orig('nexttrack', () => {
-        if (state && typeof state.next === 'function') state.next();
-      });
-      orig('play', () => {
-        if (state && typeof state.togglePlay === 'function') state.togglePlay();
-      });
-      orig('pause', () => {
-        if (state && typeof state.togglePlay === 'function') state.togglePlay();
-      });
     } catch (_) {}
   }
   setupMediaSession();
@@ -1700,6 +1712,27 @@
       if (isEditableTarget(e.target) && typeof e.target.blur === 'function') {
         e.target.blur();
       }
+      return;
+    }
+    if (e.key === 'F7' || e.code === 'F7' || e.key === 'MediaTrackPrevious') {
+      if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      state.prev();
+      return;
+    }
+    if (e.key === 'F8' || e.code === 'F8' || e.key === 'MediaPlayPause') {
+      if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      state.togglePlay();
+      return;
+    }
+    if (e.key === 'F9' || e.code === 'F9' || e.key === 'MediaTrackNext') {
+      if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      state.next();
       return;
     }
     if ((e.code === 'Space' || e.key === ' ') && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -1898,19 +1931,39 @@
   };
 
   state.next = () => {
-    const b = document.querySelector('.skipControls__next')
-      || Array.from(document.querySelectorAll('button[aria-label]'))
-        .find(el => /next|следующ/i.test(el.getAttribute('aria-label') || ''));
-    if (b) { b.click(); setTimeout(maybePostMeta, 180); return true; }
-    return false;
+    if (typeof state._scNext === 'function') {
+      try { state._scNext(); } catch (_) {}
+    }
+    const b = document.querySelector('.skipControls__next, button.playControls__next, button[title*="next" i], button[aria-label*="next" i], button[aria-label*="следующ" i]');
+    let ok = false;
+    if (b && !b.disabled) {
+      try { b.click(); ok = true; } catch (_) {}
+      try { b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+    }
+    try {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, which: 39, shiftKey: true, bubbles: true, cancelable: true }));
+      ok = true;
+    } catch (_) {}
+    setTimeout(maybePostMeta, 180);
+    return ok;
   };
 
   state.prev = () => {
-    const b = document.querySelector('.skipControls__previous')
-      || Array.from(document.querySelectorAll('button[aria-label]'))
-        .find(el => /previous|prev|предыдущ/i.test(el.getAttribute('aria-label') || ''));
-    if (b) { b.click(); setTimeout(maybePostMeta, 180); return true; }
-    return false;
+    if (typeof state._scPrev === 'function') {
+      try { state._scPrev(); } catch (_) {}
+    }
+    const b = document.querySelector('.skipControls__previous, button.playControls__previous, button[title*="prev" i], button[aria-label*="previous" i], button[aria-label*="предыдущ" i]');
+    let ok = false;
+    if (b && !b.disabled) {
+      try { b.click(); ok = true; } catch (_) {}
+      try { b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+    }
+    try {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37, which: 37, shiftKey: true, bubbles: true, cancelable: true }));
+      ok = true;
+    } catch (_) {}
+    setTimeout(maybePostMeta, 180);
+    return ok;
   };
 
   state.nextTrack = state.next;

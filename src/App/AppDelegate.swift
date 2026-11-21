@@ -112,8 +112,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                     return nil
                 }
 
-                // Не перехватываем F7/F8/F9 если фокус в нативном текстовом поле ввода
-                if let responder = self.window.firstResponder, responder is NSTextView {
+                // Не перехватываем F7/F8/F9 если фокус в нативном текстовом поле ввода (настройки)
+                if let responder = self.window.firstResponder,
+                   let textView = responder as? NSTextView,
+                   textView.isFieldEditor {
                     return event
                 }
 
@@ -262,6 +264,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         if #available(macOS 14.0, *) {
             configuration.preferences.isElementFullscreenEnabled = true
         }
+        // Отключаем встроенный MediaSession в WebKit, чтобы он не переопределял наш нативный
+        // NowPlayingController и не включал кнопки перемотки 15с (SkipForward/SkipBackward)
+        configuration.preferences.setValue(false, forKey: "mediaSessionEnabled")
+        configuration.preferences.setValue(false, forKey: "remotePlaybackEnabled")
         configuration.mediaTypesRequiringUserActionForPlayback = []
         // Инъекция на .atDocumentStart позволяет перехватить new Audio() и применить громкость до старта бандлов SoundCloud
         configuration.userContentController.addUserScript(
