@@ -1483,12 +1483,63 @@
     return { title, artist, artwork, trackURL };
   }
 
+  // ── Перехват MediaSession (замена перемотки 15с на переключение треков) ──
+  function setupMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    try {
+      if (!navigator.mediaSession._dcPatched) {
+        navigator.mediaSession._dcPatched = true;
+        const origSet = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
+        navigator.mediaSession._origSetActionHandler = origSet;
+        navigator.mediaSession.setActionHandler = (action, handler) => {
+          // Подавляем seekbackward и seekforward, которые вызывают появление кнопок перемотки 15с
+          // в Центре управления macOS и на экране блокировки вместо кнопок переключения треков
+          if (action === 'seekbackward' || action === 'seekforward') {
+            try { origSet(action, null); } catch (_) {}
+            return;
+          }
+          if (action === 'previoustrack') {
+            return origSet('previoustrack', () => {
+              if (state && typeof state.prev === 'function') state.prev();
+              else if (typeof handler === 'function') handler();
+            });
+          }
+          if (action === 'nexttrack') {
+            return origSet('nexttrack', () => {
+              if (state && typeof state.next === 'function') state.next();
+              else if (typeof handler === 'function') handler();
+            });
+          }
+          return origSet(action, handler);
+        };
+      }
+
+      const orig = navigator.mediaSession._origSetActionHandler || navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
+      try { orig('seekbackward', null); } catch (_) {}
+      try { orig('seekforward', null); } catch (_) {}
+      orig('previoustrack', () => {
+        if (state && typeof state.prev === 'function') state.prev();
+      });
+      orig('nexttrack', () => {
+        if (state && typeof state.next === 'function') state.next();
+      });
+      orig('play', () => {
+        if (state && typeof state.togglePlay === 'function') state.togglePlay();
+      });
+      orig('pause', () => {
+        if (state && typeof state.togglePlay === 'function') state.togglePlay();
+      });
+    } catch (_) {}
+  }
+  setupMediaSession();
+
   function maybePostMeta() {
     const meta = readMeta();
     const key = meta.title + '|' + meta.artist + '|' + meta.artwork + '|' + meta.trackURL;
     if (!meta.title || key === nowPlaying.lastMetaKey) return;
     nowPlaying.lastMetaKey = key;
     post('meta', meta);
+    setupMediaSession();
   }
 
   function hookSingleAudio(a) {
@@ -1507,6 +1558,7 @@
       applyStoredVolumeToMedia(a);
       postState(a);
       maybePostMeta();
+      setupMediaSession();
     };
     const onPause = () => { if (!activeMedia || activeMedia === a) postState(a); };
     const onTime = () => { if (!activeMedia || activeMedia === a) postState(a); };
@@ -1986,6 +2038,7 @@
     };
     window.addEventListener('scroll', state._scrollHandler, { passive: true });
 
+    setupMediaSession();
     updateEqualizer();
     refresh(document);
   }

@@ -123,6 +123,30 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
         // Без трека системный плеер показывает пустую карточку — не публикуем.
         guard (info[MPMediaItemPropertyTitle] as? String)?.isEmpty == false, hasState else { return }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        enforceTrackCommands()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.enforceTrackCommands()
+        }
+    }
+
+    private func enforceTrackCommands() {
+        let center = MPRemoteCommandCenter.shared()
+        center.skipForwardCommand.removeTarget(nil)
+        center.skipForwardCommand.isEnabled = false
+        center.skipForwardCommand.preferredIntervals = []
+
+        center.skipBackwardCommand.removeTarget(nil)
+        center.skipBackwardCommand.isEnabled = false
+        center.skipBackwardCommand.preferredIntervals = []
+
+        center.seekForwardCommand.removeTarget(nil)
+        center.seekForwardCommand.isEnabled = false
+
+        center.seekBackwardCommand.removeTarget(nil)
+        center.seekBackwardCommand.isEnabled = false
+
+        center.nextTrackCommand.isEnabled = true
+        center.previousTrackCommand.isEnabled = true
     }
 
     // MARK: - Обложка
@@ -172,6 +196,7 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
     func enableRemoteCommands() {
         // Не копить обработчики при повторном вызове (перезапуск окна / тесты).
         disableRemoteCommands()
+        enforceTrackCommands()
         let center = MPRemoteCommandCenter.shared()
         remoteTargets = [
             (center.playCommand, center.playCommand.addTarget { [weak self] _ in self?.runAction(.togglePlay); return .success }),
