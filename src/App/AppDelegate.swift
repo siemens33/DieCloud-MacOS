@@ -425,13 +425,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         return "window.__diecloudeThemeEngineError = 'theme-engine.js missing';"
     }
 
-    private lazy var themeEngineParts: (String, String) = {
-        let parts = themeEngineSource.components(separatedBy: "__SETTINGS__")
-        return (parts.first ?? "", parts.count > 1 ? parts.dropFirst().joined(separator: "__SETTINGS__") : "")
-    }()
-
     private func featureJavaScript() -> String {
-        themeEngineParts.0 + settings.json + themeEngineParts.1
+        themeEngineSource.replacingOccurrences(of: "__SETTINGS__", with: settings.json)
     }
 
     // MARK: - Переключатели настроек

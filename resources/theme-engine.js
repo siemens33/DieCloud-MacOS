@@ -4,7 +4,7 @@
   // DieCloude 4.5.0 — theme engine
   // Тегирование + MutationObserver + один <style> + перехват Audio + громкость + горячие клавиши.
 
-  const initial = (typeof __SETTINGS__ !== 'undefined' && __SETTINGS__) ? __SETTINGS__ : {};
+  const initial = __SETTINGS__;
   const previous = window.__diecloudeThemeEngine;
   if (previous && typeof previous.destroy === 'function') previous.destroy();
 
