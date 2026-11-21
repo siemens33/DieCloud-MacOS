@@ -35,17 +35,14 @@
 
 ---
 
-### 📦 Как установить
+### 📦 Файлы для загрузки
 
-#### Для macOS (Apple Silicon M1/M2/M3/M4 & Intel):
-1. Скачайте **`DieCloude.dmg`** из блока **Assets** ниже.
-2. Откройте образ и перетащите **DieCloude.app** в папку **«Программы»**.
-3. *(При первом запуске)* Запустите скрипт снятия карантина `Первый запуск DieCloude.command`.
-
-#### Для Windows (Windows 10 / 11):
-1. Скачайте **`DieCloud-Windows.zip`** из блока **Assets** ниже.
-2. Распакуйте в любую удобную папку и запустите **`DieCloud.exe`**.
-3. *(Для Windows 10)* Убедитесь, что установлен [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (в Windows 11 встроен в ОС).
+| Платформа | Файл | Описание |
+|---|---|---|
+| **macOS** | **`DieCloude.dmg`** | Универсальный образ для macOS 14+ (Apple Silicon M1/M2/M3/M4 & Intel) |
+| **Windows** | **`DieCloud-Setup.exe`** | **Официальный установщик** (создаёт ярлыки на рабочем столе и в меню «Пуск») |
+| **Windows** | **`DieCloud.exe`** | Портативный единый исполняемый файл (не требует установки) |
+| **Windows** | **`DieCloud-Windows-Portable.zip`** | Портативный ZIP-архив со всеми ресурсами и Xray-core |
 
 ---
 
