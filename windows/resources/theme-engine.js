@@ -1173,7 +1173,7 @@
   }
 
   function tag(scope = document) {
-    cleanupBrokenPlayerTags();
+    if (scope === document) cleanupBrokenPlayerTags();
     markAll(scope, selectors.header, 'data-dc-header');
     markAll(scope, selectors.player, 'data-dc-player');
     markPlayerBar(scope);
@@ -1319,6 +1319,20 @@
     context: null, graphs: new WeakMap(), elements: new Set()
   });
   const eqFrequencies = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
+  function cleanupDetachedMedia() {
+    for (const m of Array.from(trackedMedias)) {
+      if (!document.contains(m) && m !== activeMedia) {
+        trackedMedias.delete(m);
+      }
+    }
+    for (const m of Array.from(eq.elements)) {
+      if (!document.contains(m) && m !== activeMedia) {
+        eq.elements.delete(m);
+      }
+    }
+  }
+
 
   function updateEqualizer() {
     const bands = Array.isArray(state.settings.equalizerBands) ? state.settings.equalizerBands : [];
@@ -1769,10 +1783,6 @@
       const batch = state.pendingNodes;
       state.pendingNodes = [];
       try {
-        if (batch.length > 40) {
-          refresh(document);
-          return;
-        }
         for (const n of batch) {
           tag(n);
           removeAds(n);
@@ -1780,6 +1790,7 @@
           skipAudioAds(n);
           hookAudio(n);
         }
+        cleanupDetachedMedia();
       } catch (_) {}
       ensurePlayerBar();
       if (state.frame) cancelAnimationFrame(state.frame);
@@ -1788,7 +1799,7 @@
         applyClasses();
       });
       maybePostMeta();
-    }, 200);
+    }, 350);
   }
 
   // ── Публичный API window.__diecloude ─────────────────────────────
@@ -1946,25 +1957,32 @@
       state.observer.observe(observeTarget, { childList: true, subtree: true });
     }
 
-    // Поддержка бесконечной подгрузки списка треков при достижении конца ленты
+    // Поддержка бесконечной подгрузки списка треков при достижении конца ленты (без CPU-утечек)
     let scrollTicking = false;
-    state._scrollHandler = () => {
+    let lastScrollDispatch = 0;
+    state._scrollHandler = (e) => {
+      if (e && e.isTrusted === false) return; // Защита от бесконечного цикла синтетических событий
       if (scrollTicking) return;
       scrollTicking = true;
-      requestAnimationFrame(() => {
+      setTimeout(() => {
         scrollTicking = false;
+        const now = Date.now();
+        if (now - lastScrollDispatch < 800) return; // Ограничение частоты опроса
         const scrollBottom = window.innerHeight + window.scrollY;
         const totalHeight = Math.max(
           document.body ? document.body.scrollHeight : 0,
           document.documentElement ? document.documentElement.scrollHeight : 0
         );
-        if (totalHeight > 0 && totalHeight - scrollBottom < 280) {
+        if (totalHeight > 0 && totalHeight - scrollBottom < 300) {
           const spinner = document.querySelector('.lazyLoadingList__spinner, [class*="spinner" i]');
           if (spinner && spinner.offsetParent !== null) {
-            window.dispatchEvent(new CustomEvent('scroll'));
+            lastScrollDispatch = now;
+            // Мягкий микро-скролл для встроенного IntersectionObserver SoundCloud
+            window.scrollBy(0, 1);
+            window.scrollBy(0, -1);
           }
         }
-      });
+      }, 250);
     };
     window.addEventListener('scroll', state._scrollHandler, { passive: true });
 

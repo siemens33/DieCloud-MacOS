@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private var sidePanelTrailing: NSLayoutConstraint!
     private var observations: [NSKeyValueObservation] = []
     private var keyEventMonitor: Any?
+    private var globalMediaMonitor: Any?
     private var adBlockRuleList: WKContentRuleList?
     private var vpnController: VPNWindowController?
     private let updateManager = UpdateManager()
@@ -97,16 +98,77 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         return true
     }
 
-    // MARK: - Локальный монитор клавиш (Esc и защита текстовых полей)
+    // MARK: - Мониторы клавиш (Esc, F7/F8/F9 и аппаратные мультимедиа-клавиши)
 
     private func installKeyboardMonitor() {
-        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        // 1. Локальный монитор: Esc закрывает настройки, F7/F8/F9 управляют плеером
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .systemDefined]) { [weak self] event in
             guard let self else { return event }
-            if event.keyCode == 53, self.panelVisible, event.window === self.window {
-                self.setPanelVisible(false)
-                return nil
+
+            if event.type == .keyDown {
+                // Esc закрывает боковую панель настроек
+                if event.keyCode == 53, self.panelVisible, event.window === self.window {
+                    self.setPanelVisible(false)
+                    return nil
+                }
+
+                // Не перехватываем F7/F8/F9 если фокус в нативном текстовом поле ввода
+                if let responder = self.window.firstResponder, responder is NSTextView {
+                    return event
+                }
+
+                // Клавиатурные клавиши F7 (Предыдущий), F8 (Пауза/Воспроизведение), F9 (Следующий)
+                switch event.keyCode {
+                case 98: // F7
+                    self.playerPreviousTrack(nil)
+                    return nil
+                case 100: // F8
+                    self.playerTogglePlay(nil)
+                    return nil
+                case 101: // F9
+                    self.playerNextTrack(nil)
+                    return nil
+                default:
+                    break
+                }
+            } else if event.type == .systemDefined {
+                if self.handleSystemMediaKeyEvent(event) {
+                    return nil
+                }
             }
+
             return event
+        }
+
+        // 2. Глобальный монитор для медиа-клавиш клавиатуры (работает даже когда приложение свёрнуто или в фоне)
+        globalMediaMonitor = NSEvent.addGlobalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            _ = self?.handleSystemMediaKeyEvent(event)
+        }
+    }
+
+    @discardableResult
+    private func handleSystemMediaKeyEvent(_ event: NSEvent) -> Bool {
+        guard event.type == .systemDefined, event.subtype.rawValue == 8 else { return false }
+        let data = event.data1
+        let keyCode = Int32((data & 0xFFFF0000) >> 16)
+        let keyFlags = (data & 0x0000FFFF)
+        let keyState = (((keyFlags & 0xFF00) >> 8)) == 0xA // 0xA = key down
+
+        guard keyState else { return false }
+
+        // NX_KEYTYPE_PLAY = 16, NX_KEYTYPE_NEXT = 17, NX_KEYTYPE_PREVIOUS = 18, NX_KEYTYPE_FAST = 19, NX_KEYTYPE_REWIND = 20
+        switch keyCode {
+        case 16: // Play / Pause
+            playerTogglePlay(nil)
+            return true
+        case 17, 19: // Next
+            playerNextTrack(nil)
+            return true
+        case 18, 20: // Previous
+            playerPreviousTrack(nil)
+            return true
+        default:
+            return false
         }
     }
 
@@ -725,6 +787,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             NSEvent.removeMonitor(keyEventMonitor)
             self.keyEventMonitor = nil
         }
+        if let globalMediaMonitor {
+            NSEvent.removeMonitor(globalMediaMonitor)
+            self.globalMediaMonitor = nil
+        }
         connectionRetryWorkItem?.cancel()
         vpnHealthTimer?.invalidate()
         vpnHealthTimer = nil
@@ -739,7 +805,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     private func startVPNHealthCheck() {
-        vpnHealthTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: true) { [weak self] _ in
+        vpnHealthTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             guard let self else { return }
             guard self.isAppProxyEnabled else { return }
             if XrayManager.shared.isRunning { return }
@@ -747,7 +813,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             self.applyPerAppProxy(enabled: false, port: XrayManager.shared.localPort)
             self.vpnController?.markDisconnected(reason: "VPN отключён — процесс прокси завершился")
         }
-        vpnHealthTimer?.tolerance = 2
+        vpnHealthTimer?.tolerance = 5
     }
 
     @objc private func openVPN(_ sender: Any?) {
@@ -827,6 +893,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     deinit {
         if let keyEventMonitor { NSEvent.removeMonitor(keyEventMonitor) }
+        if let globalMediaMonitor { NSEvent.removeMonitor(globalMediaMonitor) }
         connectionRetryWorkItem?.cancel()
         vpnHealthTimer?.invalidate()
         observations.removeAll()

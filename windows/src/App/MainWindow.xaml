@@ -31,7 +31,7 @@
                     <Image Source="pack://application:,,,/resources/DieCloudIcon.ico" Width="22" Height="22" Margin="0,0,10,0"/>
                     <TextBlock Text="DieCloud" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <Border Background="#252A35" CornerRadius="4" Padding="6,2" Margin="0,0,12,0" VerticalAlignment="Center">
-                        <TextBlock Text="v5.0" FontSize="10" FontWeight="SemiBold" Foreground="#8A92A6"/>
+                        <TextBlock Text="v5.0.1" FontSize="10" FontWeight="SemiBold" Foreground="#8A92A6"/>
                     </Border>
                     <TextBlock x:Name="StatusDot" Text="●" Foreground="#28A745" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <TextBlock x:Name="StatusText" Text="SoundCloud Ready" FontSize="11" Foreground="#6C757D" VerticalAlignment="Center"/>
@@ -113,7 +113,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="DieCloud" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,8,0"/>
                                         <Border Background="#252A35" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                            <TextBlock Text="v5.0" FontSize="10" FontWeight="Bold" Foreground="#8A92A6"/>
+                                            <TextBlock Text="v5.0.1" FontSize="10" FontWeight="Bold" Foreground="#8A92A6"/>
                                         </Border>
                                     </StackPanel>
                                     <TextBlock Text="● Применяется сразу, без перезагрузки" FontSize="11" Foreground="#28A745" Margin="0,2,0,0"/>
@@ -400,7 +400,7 @@
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="Версия 5.0 (Windows Edition) · siemens" FontSize="11" Foreground="#4A5260" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Версия 5.0.1 (Windows Edition) · siemens" FontSize="11" Foreground="#4A5260" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -414,7 +414,7 @@
                         <Border Background="#2A180E" BorderBrush="#FF5500" BorderThickness="1" CornerRadius="20" HorizontalAlignment="Center" Padding="14,4" Margin="0,0,0,16">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🎉" FontSize="12" Margin="0,0,6,0"/>
-                                <TextBlock Text="DIECLOUD 5.0 · ОФИЦИАЛЬНАЯ ПРЕМЬЕРА НА WINDOWS" FontSize="11" FontWeight="Bold" Foreground="#FF8833"/>
+                                <TextBlock Text="DIECLOUD 5.0.1 · ОФИЦИАЛЬНАЯ ПРЕМЬЕРА НА WINDOWS" FontSize="11" FontWeight="Bold" Foreground="#FF8833"/>
                             </StackPanel>
                         </Border>
 

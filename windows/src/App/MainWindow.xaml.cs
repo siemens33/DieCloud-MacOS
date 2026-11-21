@@ -561,6 +561,26 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Function keys F7 (Previous), F8 (Play/Pause), F9 (Next) matching macOS
+        if (e.Key == Key.F7 && !(e.OriginalSource is TextBox))
+        {
+            _ = _bridge.ExecuteScriptAsync("(window.__diecloude?.prev || window.__diecloude?.prevTrack)?.();");
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.F8 && !(e.OriginalSource is TextBox))
+        {
+            _ = _bridge.ExecuteScriptAsync("window.__diecloude?.togglePlay?.();");
+            e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.F9 && !(e.OriginalSource is TextBox))
+        {
+            _ = _bridge.ExecuteScriptAsync("(window.__diecloude?.next || window.__diecloude?.nextTrack)?.();");
+            e.Handled = true;
+            return;
+        }
+
         // Hardware multimedia keys (Keyboards & Headsets)
         if (e.Key == Key.MediaPlayPause)
         {

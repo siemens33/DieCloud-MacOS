@@ -127,12 +127,34 @@ final class NowPlayingController: NSObject, WKScriptMessageHandler {
 
     // MARK: - Обложка
 
+    private static let artworkCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 50
+        return cache
+    }()
+
     private func loadArtwork(from urlString: String) {
         artworkTask?.cancel()
+        guard let url = URL(string: urlString), url.scheme?.hasPrefix("http") == true else {
+            info[MPMediaItemPropertyArtwork] = nil
+            publish()
+            return
+        }
+
+        let cacheKey = urlString as NSString
+        if let cachedImage = Self.artworkCache.object(forKey: cacheKey) {
+            let artwork = MPMediaItemArtwork(boundsSize: cachedImage.size) { _ in cachedImage }
+            self.info[MPMediaItemPropertyArtwork] = artwork
+            self.publish()
+            return
+        }
+
         info[MPMediaItemPropertyArtwork] = nil
-        guard let url = URL(string: urlString), url.scheme?.hasPrefix("http") == true else { return }
-        artworkTask = URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+        artworkTask = URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
             guard let data, let image = NSImage(data: data) else { return }
+            Self.artworkCache.setObject(image, forKey: cacheKey)
             DispatchQueue.main.async {
                 guard let self, self.artworkURLString == urlString else { return }
                 let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
